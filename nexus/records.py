@@ -80,7 +80,9 @@ class RecordStore:
             "refreshtoken", "privatekey", "bearertoken", "cookie",
             "prompt", "messages", "arguments", "toolarguments", "outputtext",
             "responsetext", "sourcetext", "pagecontent", "filecontent",
-            "requestbody", "responsebody", "patch", "diff",
+            "requestbody", "responsebody", "patch", "diff", "sourcecode",
+            "generatedcode", "rawcode", "codesnippet", "codeblock", "codecontent",
+            "modelinput", "modeloutput", "inputdata", "outputdata", "transcript",
         )
         forbidden_exact = {"input", "output", "content", "code", "body"}
         def inspect(value):
