@@ -101,3 +101,10 @@ GitHub Actions run #121: https://github.com/Prasong1993/Loop-Controller/actions/
 - Python 3.13: compile PASS; 58 tests PASS.
 - Added coverage includes task-specific evidence isolation and migration, pinned HTTPS transport, REST lifecycle completion/audit, paid budget gates, read-only OpenAI tool scope, usage records and MCP bearer-gate tests.
 - This does not prove live provider account access, remote deployment, production auth/tenant isolation, adversarial network resilience, or ChatGPT mobile integration.
+
+
+## Capability registry update — 2026-10-10
+- Added `nexus/capabilities.py` as the deterministic allowlist for OpenAI components and built-in tools, with explicit ENABLED / DISABLED / BLOCKED / OUT_OF_SCOPE states and model compatibility checks.
+- Current enabled flow: Responses API + Structured Outputs + Function Calling + optional Web Search, behind the double budget gate.
+- Code Interpreter, Computer Use, Shell, Apply Patch, File Search, embeddings and unrelated media APIs are not enabled merely to increase the tool count. Each requires a concrete requirement and verified compatibility/security contract.
+- See `docs/OPENAI_CAPABILITY_MATRIX.md`. Capability registry code has been updated; latest CI run must be checked before marking the new registry increment verified.
