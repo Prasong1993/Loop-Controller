@@ -7,7 +7,7 @@ NEXUS is a controller layer, not a replacement for OpenAI models or the ChatGPT 
 
 ## 1A. Primary AI core
 
-OpenAI is the primary AI core. The Responses API is the repository-side model boundary; NEXUS owns deterministic policy, state, evidence, checkpoints, and verification. The ChatGPT app session is not itself a callable API endpoint. Alternate AI providers must not be used as silent fallback and require explicit approval plus compatibility tests. See [Project Core and Compatibility Gate](PROJECT_CORE_AND_COMPATIBILITY_GATE.md).
+OpenAI is the primary AI core. The Responses API is the repository-side model boundary; NEXUS owns deterministic policy, state, evidence, checkpoints, and verification. The ChatGPT app session is not itself a callable API endpoint. Alternate AI providers must not be used as silent fallback and require explicit approval plus compatibility tests. See [Project Core and Compatibility Gate](PROJECT_CORE_AND_COMPATIBILITY_GATE.md) and [OpenAI Adapter Contract](OPENAI_ADAPTER_CONTRACT.md) for the required data-in/data-out, provenance, audit, and destination-verification rules.
 
 ## 2. End-to-end flow
 `Request → Scope/Project → Evidence → [Structured Plan | Code Proposal | Read-Only Tool Request] → Deterministic Policy → Allowlisted Adapter → Observed Result → Verification → Audit/Records → Checkpoint/Recovery → Completion`
