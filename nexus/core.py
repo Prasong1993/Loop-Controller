@@ -27,7 +27,7 @@ ALLOWED_TRANSITIONS = {
     State.EXECUTE:{State.VERIFY,State.RECOVER,State.BLOCKED},
     State.VERIFY:{State.AUDIT,State.RECOVER,State.BLOCKED},
     State.AUDIT:{State.COMPLETE,State.RECOVER,State.BLOCKED},
-    State.RECOVER:{State.RESEARCH,State.PLAN,State.POLICY,State.EXECUTE,State.VERIFY,State.BLOCKED},
+    State.RECOVER:{State.RESEARCH,State.PLAN,State.POLICY,State.VERIFY,State.BLOCKED},
     State.BLOCKED:{State.RECOVER}, State.COMPLETE:set()
 }
 
