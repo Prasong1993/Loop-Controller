@@ -12,7 +12,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 uvicorn nexus.api:app --host 127.0.0.1 --port 8000
 ```
-API docs: http://127.0.0.1:8000/docs. Do not expose this initial API to the public internet; authentication/TLS/production hardening are not implemented.
+API docs: http://127.0.0.1:8000/docs. Do not expose this prototype to the public internet. A shared bearer token exists, but production identity, tenant isolation, rate limiting, TLS deployment, secret management and security review are still missing.
 
 ## Endpoints
 - GET /health
@@ -25,7 +25,12 @@ API docs: http://127.0.0.1:8000/docs. Do not expose this initial API to the publ
 - POST /tasks/{task_id}/restore
 - POST /evidence
 - GET /projects/{project_id}/audit
+- GET /records/search
+- POST /ai/plan (OpenAI Responses API + Structured Outputs; proposal only)
+- POST /ai/run (OpenAI Responses API + read-only NEXUS function tools)
 - POST /policy/route
+- POST /evidence/verify (trusted public HTTPS fetch and quote match)
+- MCP Streamable HTTP adapter: `nexus.mcp_server:app`
 
 ## Required workflow
 INTAKE -> RESEARCH -> PLAN -> POLICY -> EXECUTE -> VERIFY -> AUDIT -> COMPLETE.
@@ -37,8 +42,17 @@ Research needs at least one VERIFIED evidence item before PLAN. EXECUTE needs ex
 ```
 Paid candidates require allow_paid=true and budget_approved=true. Candidates with warnings are excluded. This selector does not itself call external tools.
 
+## OpenAI provider wiring and budget gate
+- Set `OPENAI_API_KEY` only in the server secret environment; never in a client or repository.
+- Optional model override: `NEXUS_OPENAI_MODEL`; default currently follows the official catalog's cost-sensitive model `gpt-6-luna`.
+- Provider requests are blocked unless the request has `budget_approved=true` **and** the server has `NEXUS_OPENAI_BUDGET_APPROVED=true`. The server-side gate defaults off. This does not establish account entitlement or guarantee a fixed price.
+- `/ai/plan` returns `PROPOSAL_ONLY`; the plan is not approved for execution.
+- `/ai/run` only exposes project status, task detail and audit read tools; every tool call is checked by deterministic NEXUS policy and scoped to the active project. It exposes no arbitrary shell or code execution.
+- The planner currently enables only `web_search` as an optional built-in capability. Code Interpreter remains disabled until compatibility with the chosen model and deployment is verified.
+- Operational records capture trace IDs, redacted errors, model/tool events and usage token counts when the provider returns them. Raw prompts, raw tool arguments, raw tool outputs and API keys must not be recorded.
+
 ## Production gaps
-See ERROR_REPORT.md. Before production: authentication/authorization, tenant isolation, migrations, verified evidence ingestion, checkpoint restoration, rate limiting, secret management, structured redacted logging, idempotency keys, backup/restore, deployment configuration and platform-specific clients/adapters.
+See ERROR_REPORT.md. Before production: replace the shared bearer token with reviewed identity/OAuth and per-project roles; enforce tenant isolation and rate limits; add migrations and durable backup/restore; finish idempotency/concurrency/recovery; review egress/network security and data retention; run end-to-end, adversarial and remote integration tests; deploy behind HTTPS; verify the actual ChatGPT account/plan integration. Static source changes and CI do not establish these properties.
 
 
 ## Intended ChatGPT-app integration
@@ -77,3 +91,7 @@ Set `NEXUS_API_KEY` before remote use and terminate TLS at a trusted HTTPS gatew
 - Direct `POST /evidence` rejects status VERIFIED.
 - Fetch controls: HTTPS only, no embedded credentials, standard HTTPS port, public DNS/IP check, redirects disabled, 8-second timeout, 1 MB response limit, and text/HTML content types.
 - This is exact quote verification, not semantic entailment. High-impact claims still need reviewer confirmation. The fetcher requires production security review for DNS rebinding/SSRF and parser limitations.
+
+
+## Anchor reference boundary
+The Anchor project materials were consulted only as references for evidence provenance, requirement-to-test traceability, operational error records, checkpoints, and independent read-back. NEXUS does not copy the source project's full workflow/phases, database schema, code, names or gate rules. See [ANCHOR_REFERENCE_BOUNDARIES.md](ANCHOR_REFERENCE_BOUNDARIES.md) and [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md).
