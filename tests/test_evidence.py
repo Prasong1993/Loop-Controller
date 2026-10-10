@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
 from urllib.request import HTTPSHandler
-from nexus.evidence import EvidenceFetchError, verify_source_quote, _validate_public_https_url, _PinnedHTTPSHandler
+from unittest.mock import Mock
+from nexus.evidence import EvidenceFetchError, verify_source_quote, _validate_public_https_url, _PinnedHTTPSHandler, _PinnedHTTPSConnection
 
 class EvidenceVerificationTests(unittest.TestCase):
     def test_exact_quote_match_passes(self):
@@ -23,6 +24,17 @@ class EvidenceVerificationTests(unittest.TestCase):
 
     def test_pinned_handler_is_a_real_https_handler(self):
         self.assertTrue(issubclass(_PinnedHTTPSHandler, HTTPSHandler))
+    def test_pinned_connection_uses_validated_ip_but_original_tls_hostname(self):
+        connection=_PinnedHTTPSConnection("docs.example.com","93.184.216.34",timeout=1)
+        fake_socket=object()
+        fake_context=Mock()
+        fake_context.wrap_socket.return_value="wrapped-socket"
+        connection._context=fake_context
+        with patch("nexus.evidence.socket.create_connection",return_value=fake_socket) as create_connection:
+            connection.connect()
+        self.assertEqual(create_connection.call_args.args[0],("93.184.216.34",443))
+        fake_context.wrap_socket.assert_called_once_with(fake_socket,server_hostname="docs.example.com")
+        self.assertEqual(connection.sock,"wrapped-socket")
     def test_private_dns_answer_is_rejected(self):
         with patch("nexus.evidence.socket.getaddrinfo", return_value=[(2,1,6,"",("127.0.0.1",443))]):
             with self.assertRaises(EvidenceFetchError):
