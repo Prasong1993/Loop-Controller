@@ -82,3 +82,13 @@ The following remain open before production: authentication/authorization, TLS, 
 - Added `nexus/mcp_server.py` with bounded MCP tools and a fail-closed bearer-token middleware; added OpenAPI contract and MCP authentication tests.
 - **Important limitation:** exact quote existence does not prove that the quote semantically supports the full claim. A human/reviewer policy gate remains necessary for high-impact claims. The URL fetcher is prototype-grade; production SSRF/DNS rebinding and content parsing require independent security review.
 - Latest confirmed passing CI before MCP auth test correction: run #43, commit `460ef9d500f54e3158e3b024f149d3e6ccfdbb98`, success: https://github.com/Prasong1993/Loop-Controller/actions/runs/38012369558. Run after MCP adapter auth test correction is pending.
+
+
+## Consolidated implementation update — 2026-10-10
+- Added OpenAI Responses API structured plan proposals and a separate read-only function-tool worker; neither model output nor strict schema is treated as authorization.
+- Added double budget gate: per-request `budget_approved=true` plus server-side `NEXUS_OPENAI_BUDGET_APPROVED=true`. Default is blocked; no live provider request was made during this implementation.
+- Added searchable operational records, trace correlation, redacted provider/tool errors and token-usage aggregation when available.
+- Moved VERIFIED evidence creation to the core fetch-and-quote verification boundary and added DNS-pinned HTTPS transport code.
+- Added architecture map and Anchor reference-only boundary documents; Anchor source workflow and schema were not copied.
+- Added/expanded regression tests. **Do not mark tests PASS until the latest GitHub Actions run is complete and its jobs are inspected.**
+- Still RELEASE BLOCKED: shared bearer token/tenant authorization, deployment/TLS/secrets, concurrency/idempotency, task-level evidence traceability, and account-specific ChatGPT MCP/mobile integration are unresolved.
