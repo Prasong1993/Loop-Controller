@@ -74,4 +74,25 @@ class CodeProposalTests(unittest.TestCase):
             gen.propose(project_id="p1",task="change code",allowed_paths=["nexus/helper.py"],budget_approved=True)
         self.assertIsNone(self.fake.kwargs)
 
+
+    def test_noncanonical_paths_rejected_before_provider_call(self):
+        gen=OpenAICodeProposalGenerator(self.store,client=self.client)
+        for path in ("./nexus/helper.py","nexus//helper.py","nexus/./helper.py",
+                     "nexus/../helper.py"," nexus/helper.py","nexus/helper.py "):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    gen.propose(project_id="p1",task="change code",allowed_paths=[path])
+        self.assertIsNone(self.fake.kwargs)
+
+    def test_duplicate_proposed_paths_are_blocked(self):
+        duplicate={"goal":"duplicate","files":[
+            {"path":"nexus/helper.py","operation":"create","content":"x","rationale":"first"},
+            {"path":"nexus/helper.py","operation":"update","content":"y","rationale":"second"}],
+            "tests":[],"risks":[],"blocked_questions":[]}
+        fake=FakeResponses(SimpleNamespace(output_text=json.dumps(duplicate),id="dup-resp"))
+        gen=OpenAICodeProposalGenerator(self.store,client=SimpleNamespace(responses=fake))
+        with self.assertRaises(CodeProposalError) as ctx:
+            gen.propose(project_id="p1",task="change code",allowed_paths=["nexus/helper.py"],budget_approved=True)
+        self.assertEqual(ctx.exception.code,"DUPLICATE_CODE_PATH")
+
 if __name__=="__main__": unittest.main()
