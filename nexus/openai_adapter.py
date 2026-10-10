@@ -62,6 +62,9 @@ class OpenAIResponsesWorker:
                 record(record_type=record_type, model=self.model, **fields)
 
         for round_index in range(self.max_tool_rounds + 1):
+            # Record the attempted stage before crossing the provider boundary. This is
+            # metadata-only; never persist the prompt or request body.
+            log("usage", outcome="request_started", round=round_index)
             try:
                 response = self.client.responses.create(
                     model=self.model, input=conversation, tools=tools,
@@ -127,6 +130,8 @@ class OpenAIResponsesWorker:
                             try:
                                 result = tool_handlers[name](arguments)
                                 executed.append({"tool": name, "call_id": call_id, "outcome": "executed"})
+                                log("usage", outcome="tool_execution_completed", tool=name,
+                                    call_id=call_id, round=round_index)
                             except Exception as exc:
                                 result = {"error": "TOOL_EXECUTION_FAILED",
                                           "error_class": type(exc).__name__, "retryable": False}
