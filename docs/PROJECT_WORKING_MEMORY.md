@@ -543,3 +543,41 @@ These source files show existing implementation claims at source level only. The
 - Current account model entitlement, quota, billing, live request and real per-task cost: UNKNOWN / NOT RUN.
 - Paid API activity: NOT AUTHORIZED by this checkpoint.
 - Next: map lifecycle acceptance tests, inspect the recorded failed CI logs, fix only demonstrated defects, run offline/mock tests, and request approval before bounded live-provider testing.
+
+
+## 24. Clarification — prioritize built-in tools, skills, and connected apps (not model APIs)
+
+**Decision date:** 2026-10-11  
+**Status:** USER CLARIFICATION RECORDED.
+
+The user's intended next task is NOT primarily a comparison of model-engine APIs. It is to inventory and assemble existing built-in ChatGPT tools, installed/available Skills, connected apps/plugins, and tool integrations into the user's preferred end-to-end workflow, from receiving a command through planning, evidence collection, execution, verification, and delivery. Research and recommendations must prioritize reuse of existing capabilities and avoid building duplicate engines.
+
+### Current tool/skill inventory discovered in this workspace
+
+- **Superpowers skills**: brainstorming, writing plans, parallel-agent dispatch, systematic debugging, test-driven development, code review, execution plans, and verification-before-completion. Available as installed skills; actual invocation depends on task/tool context.
+- **GitHub connector**: inspect repositories, issues/PRs, CI and publish code/docs; currently installed/enabled.
+- **Dropbox connector**: find/read/save files and create links; currently installed/enabled. User-provided prior Dropbox material is reference-only unless specifically authorized for mutation.
+- **Exa, Firecrawl, Tavily, Context.dev, TinyFish**: installed/enabled research/search/extraction/browser workflow tools according to current plugin discovery. They overlap in some functions; do not invoke all by default. Choose the smallest tool set that meets evidence requirements; compare capabilities/quotas only with official or tool-returned evidence.
+- **Plugin Creator skills**: create/update a custom ChatGPT/Codex app/plugin, tools, and skills when existing tools cannot cover a required integration.
+- **Codex Tasks skill**: create/continue durable remote coding tasks where registered environments are available.
+- **Notion, Coda, Figma, Vercel, Floot and others** are discoverable in the connector catalog; use only if a concrete workflow requirement needs them. Do not install or enable extra apps without the user's explicit action.
+- The exact feature availability in the user's Android UI and per-account quotas/permissions are not proven by connector catalog visibility alone.
+
+### Preferred investigation approach
+
+1. Map each stage of the workflow to already available built-in tools/skills/connectors.
+2. For each candidate record: stage, exact capability, installed/enabled/available status, permission needed, whether it works from this ChatGPT session/mobile context, cost/quota evidence if relevant, overlap with another tool, verification method, and limitations.
+3. Prefer native built-ins and already installed connectors; do not add a second web-search provider if an existing one already satisfies the source-quality and extraction requirements.
+4. Use Superpowers for the software-development method (plan, debug, test, review, verify), not as an autonomous permission system or persistent project database.
+5. Use GitHub as the project's durable engineering history when authorized; keep Working Memory concise and evidence-linked.
+6. Use existing file/search/browser tools for evidence collection; use project controller and deterministic tests for policy and verification. A skill is guidance, not proof that an operation was executed.
+7. Only create or update a custom plugin/skill/MCP integration for a specific demonstrated gap. Confirm permissions and user approval before any installation, publication, deployment, destructive action, or paid operation.
+8. Do not claim built-in tools can control hidden ChatGPT chain-of-thought or automatically inspect/control a private Android chat session. Tool capability must be demonstrated by an authorized end-to-end test.
+
+### Status at checkpoint
+
+- User's intended scope: RECORDED — built-in tools / skills / connected apps first.
+- Initial installed/available tool catalog discovery: RECOVERED from current workspace tool/plugin discovery; not a complete product-wide catalog.
+- Stage-by-stage capability map and overlap analysis: NOT YET COMPLETE.
+- Android UI availability, per-account quotas, and live end-to-end mobile operation: UNKNOWN / NOT VERIFIED.
+- New API engine or custom plugin creation: NOT AUTHORIZED by this clarification; first reuse and test existing capabilities.
