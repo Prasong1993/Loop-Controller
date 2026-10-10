@@ -301,18 +301,22 @@ async def require_project_access(request:Request, authorization:str|None=Header(
     # Generic route-selection has no project parameter and only returns policy metadata.
     if request.url.path=="/policy/route":
         return principal
-    if project_id and not project_authorization.has_access(project_id,principal):
-        # Preserve 404 for unknown project IDs to avoid revealing tenant existence.
+    if project_id:
         try:
             controller.status(project_id)
         except ValueError as exc:
             raise HTTPException(status_code=404,detail="unknown project_id") from exc
-        raise HTTPException(status_code=403,detail={"code":"PROJECT_ACCESS_DENIED","message":"Principal is not a member of this project."})
+        if not project_authorization.has_access(project_id,principal):
+            raise HTTPException(status_code=403,detail={"code":"PROJECT_ACCESS_DENIED","message":"Principal is not a member of this project."})
+        if request.method in {"POST","PUT","PATCH","DELETE"} and not project_authorization.can_write(project_id,principal):
+            raise HTTPException(status_code=403,detail={"code":"PROJECT_READ_ONLY","message":"Project membership is read-only."})
     return principal
 
 def ensure_project_access(project_id:str,request:Request)->None:
     principal=getattr(request.state,"principal","")
     if project_authorization.has_access(project_id,principal):
+        if request.method in {"POST","PUT","PATCH","DELETE"} and not project_authorization.can_write(project_id,principal):
+            raise HTTPException(status_code=403,detail={"code":"PROJECT_READ_ONLY","message":"Project membership is read-only."})
         return
     try:
         controller.status(project_id)
