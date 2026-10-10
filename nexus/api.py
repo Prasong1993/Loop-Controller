@@ -16,8 +16,9 @@ from nexus.core import NEXUS, PolicyDenied
 from nexus.evidence import EvidenceFetchError, verify_source_quote
 from nexus.openai_adapter import OpenAIResponsesWorker, OpenAIWorkerError
 from nexus.openai_planner import OpenAIPlanGenerator, OpenAIPlanError
+from nexus.version import VERSION
 
-app=FastAPI(title="NEXUS Controller API",version="0.2.0",
+app=FastAPI(title="NEXUS Controller API",version=VERSION,
  description="Evidence-first deterministic workflow controller")
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
@@ -144,7 +145,7 @@ def invoke(fn,*args,**kwargs):
         raise HTTPException(status_code=status,detail=message) from exc
 
 @app.get("/health")
-def health(): return {"status":"ok","service":"nexus-controller","version":"0.2.0"}
+def health(): return {"status":"ok","service":"nexus-controller","version":VERSION}
 
 @app.post("/projects",status_code=201,dependencies=[Depends(require_api_key)])
 def create_project(body:ProjectIn): return invoke(controller.create_project,body.name)
