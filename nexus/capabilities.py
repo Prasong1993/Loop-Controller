@@ -19,6 +19,13 @@ CAPABILITY_REGISTRY = {
         "risk": "model_output",
         "notes": "Constrains output shape; does not establish truth or authorize execution.",
     },
+    "code_generation": {
+        "status": "ENABLED",
+        "kind": "responses_structured_output",
+        "supported_models": ["gpt-6-astra", "gpt-6.1-sol"],
+        "risk": "code_proposal",
+        "notes": "Generates allowlisted file-content proposals only; does not write files or execute code."
+    },
     "function_calling": {
         "status": "ENABLED",
         "kind": "tool_protocol",
