@@ -56,10 +56,17 @@ async def operational_record_middleware(request: Request, call_next):
         project_id="system"
         task_id=None
         segments=[part for part in request.url.path.split("/") if part]
-        if len(segments)>=2 and segments[0]=="projects":
+        if getattr(request.state,"project_id",None):
+            project_id=request.state.project_id
+        elif len(segments)>=2 and segments[0]=="projects":
             project_id=segments[1]
         elif len(segments)>=2 and segments[0]=="tasks":
             task_id=segments[1]
+            try:
+                task_row=controller.get_task(task_id)
+                project_id=task_row["project_id"]
+            except Exception:
+                pass
         try:
             record_store.append(project_id=project_id,task_id=task_id,
                 record_type="usage",trace_id=trace_id,actor_type="system",
@@ -196,11 +203,15 @@ def invoke(fn,*args,**kwargs):
 def health(): return {"status":"ok","service":"nexus-controller","version":VERSION}
 
 @app.post("/projects",status_code=201,dependencies=[Depends(require_api_key)])
-def create_project(body:ProjectIn): return invoke(controller.create_project,body.name)
+def create_project(body:ProjectIn,request:Request):
+    result=invoke(controller.create_project,body.name)
+    request.state.project_id=result["project_id"]
+    return result
 @app.get("/projects/{project_id}/status",dependencies=[Depends(require_api_key)])
 def project_status(project_id:str): return invoke(controller.status,project_id)
 @app.post("/tasks",status_code=201,dependencies=[Depends(require_api_key)])
-def create_task(body:TaskIn):
+def create_task(body:TaskIn,request:Request):
+    request.state.project_id=body.project_id
     return invoke(controller.create_task,body.project_id,body.title,body.expected_outcome,body.verification_method)
 @app.get("/tasks/{task_id}",dependencies=[Depends(require_api_key)])
 def get_task(task_id:str): return invoke(controller.get_task,task_id)
@@ -213,11 +224,13 @@ def checkpoint(task_id:str): return invoke(controller.checkpoint,task_id)
 def restore_checkpoint(task_id:str,body:RestoreIn):
     return invoke(controller.restore_checkpoint,task_id,body.checkpoint_id,body.actor,body.reason)
 @app.post("/evidence",dependencies=[Depends(require_api_key)])
-def add_evidence(body:EvidenceIn):
+def add_evidence(body:EvidenceIn,request:Request):
+    request.state.project_id=body.project_id
     return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes,body.task_id)
 
 @app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
-def verify_evidence(body:VerifyEvidenceIn):
+def verify_evidence(body:VerifyEvidenceIn,request:Request):
+    request.state.project_id=body.project_id
     try:
         return invoke(controller.verify_and_add_evidence,body.project_id,body.claim,body.source_url,
                      body.quoted_text,body.notes,"api-source-verifier",task_id=body.task_id)
@@ -227,12 +240,13 @@ def verify_evidence(body:VerifyEvidenceIn):
 def audit(project_id:str,task_id:str|None=None): return invoke(controller.audit,project_id,task_id)
 
 @app.get("/records/search",dependencies=[Depends(require_api_key)])
-def search_records(project_id:str,record_type:str|None=None,task_id:str|None=None,
+def search_records(request:Request,project_id:str,record_type:str|None=None,task_id:str|None=None,
                    trace_id:str|None=None,operation_id:str|None=None,status:str|None=None,
                    error_code:str|None=None,component:str|None=None,query:str|None=None,
                    since:str|None=None,until:str|None=None,limit:int=100,offset:int=0):
+    request.state.project_id=project_id
     try:
-        return record_store.search(project_id=project_id,record_type=record_type,task_id=task_id,
+        return record_store.search(project_id=project_id,record_type=record_type,
             trace_id=trace_id,operation_id=operation_id,status=status,error_code=error_code,
             component=component,query=query,since=since,until=until,limit=limit,offset=offset)
     except ValueError as exc:
@@ -240,6 +254,7 @@ def search_records(project_id:str,record_type:str|None=None,task_id:str|None=Non
 
 @app.post("/ai/plan",dependencies=[Depends(require_api_key)])
 def propose_ai_plan(body:AIPlanIn,request:Request):
+    request.state.project_id=body.project_id
     # A request-level checkbox alone cannot enable paid API usage: the deployment
     # operator must also set the server-side budget gate.
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
@@ -257,6 +272,7 @@ def propose_ai_plan(body:AIPlanIn,request:Request):
 
 @app.post("/ai/code-proposal",dependencies=[Depends(require_api_key)])
 def propose_code(body:AICodeProposalIn,request:Request):
+    request.state.project_id=body.project_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
     trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     # Validate project/task scope before a paid provider call.
@@ -287,6 +303,7 @@ _AI_READ_TOOLS=[
 
 @app.post("/ai/run",dependencies=[Depends(require_api_key)])
 def run_ai_with_read_tools(body:AIRunIn,request:Request):
+    request.state.project_id=body.project_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
     if not (body.budget_approved and budget_gate):
         try:
