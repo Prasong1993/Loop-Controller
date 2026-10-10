@@ -108,3 +108,10 @@ GitHub Actions run #121: https://github.com/Prasong1993/Loop-Controller/actions/
 - Current enabled flow: Responses API + Structured Outputs + Function Calling + optional Web Search, behind the double budget gate.
 - Code Interpreter, Computer Use, Shell, Apply Patch, File Search, embeddings and unrelated media APIs are not enabled merely to increase the tool count. Each requires a concrete requirement and verified compatibility/security contract.
 - See `docs/OPENAI_CAPABILITY_MATRIX.md`. Capability registry code has been updated; latest CI run must be checked before marking the new registry increment verified.
+
+
+## Code proposal path and latest verified regression — 2026-10-10
+- Added `POST /ai/code-proposal` to produce structured file-content proposals with `gpt-6-astra` by default (or reviewed `gpt-6.1-sol`), an explicit file-path allowlist, task/project checks and the double budget gate.
+- The endpoint does not write files, apply patches, run tests or execute code. It logs file hashes and metadata rather than raw code.
+- GitHub Actions run #150 passed compile + 67 tests on Python 3.11, 3.12 and 3.13: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015297401.
+- Remaining release blockers: no live provider call/API entitlement check, no code-write/execution adapter, no secure deployment or production identity/tenant isolation, and no registered ChatGPT mobile integration.
