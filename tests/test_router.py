@@ -165,6 +165,31 @@ class ToolRouterTests(unittest.TestCase):
         self.assertIn("ROUTE_COMPLETED", persisted_stages)
         self.assertTrue(any(kind == "ROUTER_CHECKPOINT_CREATED" for kind, _ in audit_rows))
 
+    def test_every_route_round_has_durable_run_and_ordered_event_history(self):
+        result = self.route([candidate("free", FakeAdapter())])
+        self.assertEqual(result.decision, "ALLOW")
+        with sqlite3.connect(self.db_path) as con:
+            con.row_factory = sqlite3.Row
+            runs = con.execute(
+                "SELECT run_id,status,started_at,finished_at,outcome_json FROM router_runs WHERE task_id=?",
+                (self.task_id,),
+            ).fetchall()
+            self.assertEqual(len(runs), 1)
+            run = runs[0]
+            self.assertEqual(run["status"], "COMPLETED")
+            self.assertIsNotNone(run["finished_at"])
+            events = con.execute(
+                "SELECT sequence_no,event_type,details_json FROM router_run_events WHERE run_id=? ORDER BY sequence_no",
+                (run["run_id"],),
+            ).fetchall()
+        kinds = [row["event_type"] for row in events]
+        self.assertEqual([row["sequence_no"] for row in events], list(range(1, len(events) + 1)))
+        self.assertEqual(kinds[0], "RUN_STARTED")
+        self.assertIn("ROUTE_STARTED", kinds)
+        self.assertIn("CHECKPOINT_PERSISTED", kinds)
+        self.assertIn("ROUTE_COMPLETED", kinds)
+        self.assertEqual(json.loads(run["outcome_json"])["verified"], True)
+
     def test_missing_task_id_stops_before_provider_execution(self):
         adapter = FakeAdapter()
         with self.assertRaisesRegex(ValueError, "task.task_id is required"):
