@@ -73,3 +73,12 @@ The following remain open before production: authentication/authorization, TLS, 
 - Added `POST /tasks/{task_id}/restore` and API bearer-token gate in `nexus/api.py`. Remote requests fail closed if `NEXUS_API_KEY` is absent; health remains public. Unknown identifiers now map to 404, policy denials to 403, and invalid transitions to 409.
 - Added API authentication/error mapping tests and core restore tests. These are **implemented but CI status for the newest commit is pending verification**.
 - Remaining gaps: account-specific ChatGPT connector selection/configuration, secure deployment, production identity/tenant isolation, evidence content verification, provider execution adapters and restore idempotency/production review.
+
+
+## Implementation update — source verification and MCP adapter
+
+- Added `nexus/evidence.py`: HTTPS-only source fetching, rejects localhost/private-address resolution, blocks redirects, caps response size at 1 MB, allows text/HTML, and verifies an exact normalized quote match.
+- Direct `POST /evidence` can no longer mark evidence VERIFIED. Use `POST /evidence/verify`, which fetches source content before recording the quote/hash and audit event.
+- Added `nexus/mcp_server.py` with bounded MCP tools and a fail-closed bearer-token middleware; added OpenAPI contract and MCP authentication tests.
+- **Important limitation:** exact quote existence does not prove that the quote semantically supports the full claim. A human/reviewer policy gate remains necessary for high-impact claims. The URL fetcher is prototype-grade; production SSRF/DNS rebinding and content parsing require independent security review.
+- Latest confirmed passing CI before MCP auth test correction: run #43, commit `460ef9d500f54e3158e3b024f149d3e6ccfdbb98`, success: https://github.com/Prasong1993/Loop-Controller/actions/runs/38012369558. Run after MCP adapter auth test correction is pending.
