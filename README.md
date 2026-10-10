@@ -1,6 +1,6 @@
 # NEXUS — AI Workflow Control Layer
 
-**สถานะ:** Controller prototype + CI ผ่าน; live ChatGPT integration ยัง NOT CONFIGURED / NOT RUN  
+**สถานะ:** Controller prototype; final CI run #179 ผ่าน OpenAPI checks + 73 tests บน Python 3.11–3.13; live ChatGPT integration ยัง NOT CONFIGURED / NOT RUN  
 **เอกสารหลัก:** [NEXUS System Design Reference Document (SDRD)](docs/NEXUS_SDRD_v1.0_TH.md)
 
 NEXUS เป็นชั้นควบคุม workflow สำหรับงานที่ AI ช่วยวิเคราะห์ วางแผน และใช้เครื่องมือ โดยตรวจ policy ก่อน execute ตรวจผลก่อนส่งมอบ และเก็บหลักฐานที่ตรวจสอบย้อนหลังได้
@@ -23,6 +23,7 @@ NEXUS เป็นชั้นควบคุม workflow สำหรับง�
 - [Architecture and connection map](docs/ARCHITECTURE_MAP.md)
 - [OpenAI capability matrix](docs/OPENAI_CAPABILITY_MATRIX.md)
 - [Operational record schema and search guide](docs/OPERATIONAL_RECORD_SCHEMA.md)
+- [Latest CI run — 73 tests + OpenAPI contract checks](https://github.com/Prasong1993/Loop-Controller/actions/runs/38015769056)
 - [Anchor reference-only boundary](docs/ANCHOR_REFERENCE_BOUNDARIES.md)
 
 ## ข้อจำกัดสำคัญ
