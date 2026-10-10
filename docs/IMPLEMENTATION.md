@@ -27,6 +27,7 @@ API docs: http://127.0.0.1:8000/docs. Do not expose this prototype to the public
 - GET /projects/{project_id}/audit
 - GET /records/search
 - POST /ai/plan (OpenAI Responses API + Structured Outputs; proposal only)
+- POST /ai/code-proposal (OpenAI Responses API; allowlisted file-content proposal only)
 - POST /ai/run (OpenAI Responses API + read-only NEXUS function tools)
 - POST /policy/route
 - POST /evidence/verify (trusted public HTTPS fetch and quote match)
@@ -47,6 +48,7 @@ Paid candidates require allow_paid=true and budget_approved=true. Candidates wit
 - Optional model override: `NEXUS_OPENAI_MODEL`; default currently follows the official catalog's cost-sensitive model `gpt-6-luna`.
 - Provider requests are blocked unless the request has `budget_approved=true` **and** the server has `NEXUS_OPENAI_BUDGET_APPROVED=true`. The server-side gate defaults off. This does not establish account entitlement or guarantee a fixed price.
 - `/ai/plan` returns `PROPOSAL_ONLY`; the plan is not approved for execution.
+- `/ai/code-proposal` uses the official code-generation pattern with a strict structured response, explicit allowed file paths, a model allowlist and the double budget gate. It returns code proposals only; no file write or code execution occurs.
 - `/ai/run` only exposes project status, task detail and audit read tools; every tool call is checked by deterministic NEXUS policy and scoped to the active project. It exposes no arbitrary shell or code execution.
 - The planner currently enables only `web_search` as an optional built-in capability. Code Interpreter remains disabled until compatibility with the chosen model and deployment is verified.
 - Operational records capture trace IDs, redacted errors, model/tool events and usage token counts when the provider returns them. Raw prompts, raw tool arguments, raw tool outputs and API keys must not be recorded.
