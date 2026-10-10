@@ -212,7 +212,9 @@ def project_status(project_id:str): return invoke(controller.status,project_id)
 @app.post("/tasks",status_code=201,dependencies=[Depends(require_api_key)])
 def create_task(body:TaskIn,request:Request):
     request.state.project_id=body.project_id
-    return invoke(controller.create_task,body.project_id,body.title,body.expected_outcome,body.verification_method)
+    result=invoke(controller.create_task,body.project_id,body.title,body.expected_outcome,body.verification_method)
+    request.state.task_id=result["task_id"]
+    return result
 @app.get("/tasks/{task_id}",dependencies=[Depends(require_api_key)])
 def get_task(task_id:str): return invoke(controller.get_task,task_id)
 @app.post("/tasks/{task_id}/transition",dependencies=[Depends(require_api_key)])
