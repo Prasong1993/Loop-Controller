@@ -68,10 +68,10 @@ Set `NEXUS_API_KEY` in the server environment and send `Authorization: Bearer <t
 
 Unknown project/task/checkpoint identifiers map to HTTP 404; policy denials map to HTTP 403; invalid workflow transitions map to HTTP 409. Safe checkpoint restore is allowed only from BLOCKED/RECOVER and refuses checkpoints at EXECUTE or other unsafe states.
 
-The API contract is documented in [openapi.yaml](../openapi.yaml) and [ChatGPT Integration Contract](CHATGPT_INTEGRATION_CONTRACT.md).
+The API contract is documented in [openapi.yaml](../openapi.yaml) and [ChatGPT Integration Contract](CHATGPT_INTEGRATION_CONTRACT.md). The OpenAI component selection and current enablement gates are recorded in [OpenAI Capability Matrix](OPENAI_CAPABILITY_MATRIX.md); the machine-readable allowlist is in `nexus/capabilities.py`.
 
 ## Remaining production/integration gaps
-Tenant isolation tied to authenticated identities, migrations, actual source-content evidence verification, restore/idempotency stress tests, rate limiting, redacted logs, backup/restore, secure deployment and a supported ChatGPT connector/adapter remain open. Do not expose the API publicly until reviewed and deployed securely.
+Tenant isolation tied to authenticated identities, task-level requirement/claim traceability and evidence freshness, restore/idempotency stress tests, rate limiting, redacted logs, backup/restore, secure deployment and a supported ChatGPT connector/adapter remain open. Core source-content verification and additive task-scope migration are implemented and covered by CI tests; production network security still needs review. Do not expose the API publicly until reviewed and deployed securely.
 
 
 ## Remote MCP adapter
@@ -89,8 +89,8 @@ Set `NEXUS_API_KEY` before remote use and terminate TLS at a trusted HTTPS gatew
 
 - `POST /evidence/verify` fetches a public HTTPS text/HTML source and records VERIFIED only when the supplied exact quote is found in the fetched content.
 - Direct `POST /evidence` rejects status VERIFIED.
-- Fetch controls: HTTPS only, no embedded credentials, standard HTTPS port, public DNS/IP check, redirects disabled, 8-second timeout, 1 MB response limit, and text/HTML content types.
-- This is exact quote verification, not semantic entailment. High-impact claims still need reviewer confirmation. The fetcher requires production security review for DNS rebinding/SSRF and parser limitations.
+- Fetch controls: HTTPS only, no embedded credentials, standard HTTPS port, public DNS/IP check, connection pinned to a validated IP while preserving TLS hostname verification, redirects disabled, 8-second timeout, 1 MB response limit, and text/HTML content types.
+- This is exact quote verification, not semantic entailment. High-impact claims still need reviewer confirmation. Adversarial live network testing and production SSRF review remain open.
 
 
 ## Anchor reference boundary
