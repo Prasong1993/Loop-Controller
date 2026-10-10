@@ -73,13 +73,22 @@ class RecordStore:
         trace_id = trace_id or str(uuid.uuid4())
         occurred_at = utc_now()
         safe_payload = dict(payload)
-        # Reject common credential-bearing keys instead of persisting them.
-        forbidden = {"authorization", "api_key", "apikey", "password", "secret", "access_token", "refresh_token"}
+        # Reject credentials and raw user/provider/code content at the storage boundary.
+        # Normalize key spelling so OPENAI_API_KEY, client-secret, etc. cannot bypass the guard.
+        forbidden_markers = (
+            "authorization", "apikey", "password", "secret", "accesstoken",
+            "refreshtoken", "privatekey", "bearertoken", "cookie",
+            "prompt", "messages", "arguments", "toolarguments", "outputtext",
+            "responsetext", "sourcetext", "pagecontent", "filecontent",
+            "requestbody", "responsebody", "patch", "diff",
+        )
+        forbidden_exact = {"input", "output", "content", "code", "body"}
         def inspect(value):
             if isinstance(value, dict):
                 for key, nested in value.items():
-                    if str(key).casefold() in forbidden:
-                        raise ValueError("secret-bearing payload keys must not be recorded")
+                    normalized = "".join(ch for ch in str(key).casefold() if ch.isalnum())
+                    if normalized in forbidden_exact or any(marker in normalized for marker in forbidden_markers):
+                        raise ValueError("secret-bearing or raw-content payload keys must not be recorded")
                     inspect(nested)
             elif isinstance(value, list):
                 for nested in value:
