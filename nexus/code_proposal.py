@@ -116,8 +116,8 @@ class OpenAICodeProposalGenerator:
             )
             proposal = json.loads(getattr(response, "output_text", ""))
             files = proposal.get("files") if isinstance(proposal, dict) else None
-            if not isinstance(files, list):
-                raise ValueError("structured code proposal has an invalid shape")
+            if not isinstance(files, list) or not files:
+                raise ValueError("structured code proposal must contain at least one file")
             seen = set()
             for item in files:
                 path = item.get("path", "")
