@@ -409,3 +409,23 @@ Decision recorded: users and the controller should be able to refer to projects 
 - Cross-session resolution and cross-project isolation acceptance tests: NOT_RUN.
 - Next action: include the project-alias registry and resolver in the existing master-database/API mapping; reuse the existing project table and stable project IDs where suitable rather than creating a duplicate registry without need.
 - No PR merge authorized.
+
+## 20. Mandatory end-of-response HTML project roadmap
+
+Decision recorded: at the end of every assistant response in this project workflow, provide a compact HTML roadmap/status block that acts as the human-readable cross-project index. It must identify known project aliases (Project 1, Project 2, Project 3, etc.), their canonical project identities, current phase/checkpoint, status, blockers, and next action where evidence exists.
+
+### Rules
+- Use a complete, self-contained HTML snippet suitable for copying into an HTML viewer; prefer semantic sections, a project table/cards, and a roadmap with phase/status indicators.
+- Keep the HTML block at the end of every response, including status updates and answers about a single project, so the project index remains visible.
+- Resolve alias mappings from the authoritative Project Master registry when implemented. Until runtime registry data is available, show `UNASSIGNED / NOT VERIFIED`; do not guess that the current repository is Project 1 or any other alias.
+- Clearly distinguish `VERIFIED`, `RECORDED`, `UNKNOWN`, `BLOCKED`, and `NOT RUN`. A requirement written in documentation is not proof of runtime implementation.
+- Include only current, useful summaries, not a dump of all project records. Every project reference must retain its canonical project ID internally when available.
+- The HTML roadmap is a view of project state, not itself the authoritative database. Reconcile it against the repository and master registry before claiming current status.
+- Do not claim an interactive/live dashboard unless it is actually hosted and connected to the runtime data source. A static HTML block is a snapshot authored in the response.
+- Keep the roadmap concise and mobile-readable.
+
+### Current status
+- Requirement: RECORDED.
+- Automatic generation from a persistent master registry: UNKNOWN / not yet verified.
+- Project alias assignments for Project 1, Project 2, Project 3: NOT VERIFIED; no aliases are to be guessed.
+- No PR merge authorized.
