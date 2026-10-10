@@ -156,3 +156,7 @@ GitHub Actions run #121 (commit `a3b898e0437490887046e7629465995f5c959e84`) comp
 - Added `nexus/code_proposal.py` and `POST /ai/code-proposal`, backed by the Responses API and strict structured outputs, with a code-model allowlist drawn from `nexus/capabilities.py`.
 - Every request requires an explicit `allowed_paths` list, task/project scope validation, and both request/server budget approval. Proposed paths are checked again after generation. Only hashes and metadata are recorded; code contents are returned to the caller but not persisted in operational logs.
 - No file write or code execution occurs. Shell, Apply Patch, Code Interpreter and Computer Use remain disabled. CI run #150 passed 67 tests across Python 3.11–3.13: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015297401.
+
+
+## Latest verification read-back
+Run #159 passed compile and 67 tests on Python 3.11, 3.12 and 3.13 at commit `6e5dcfcd46d2781a315bfefdfa6dbcfd34b53bea`: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015447654. It includes task/project-scoped operational record assertions and the code-proposal API. No live provider, public deployment or ChatGPT mobile test was performed.
