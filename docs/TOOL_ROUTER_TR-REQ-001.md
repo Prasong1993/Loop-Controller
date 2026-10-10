@@ -1,10 +1,10 @@
 # TR-REQ-001 — Deterministic Tool Router
 
-Status: **IMPLEMENTED IN FEATURE BRANCH; CI AND LIVE PROVIDER INTEGRATION NOT YET VERIFIED**
+Status: **IMPLEMENTED ON `work/project-control-api-hardening-2026-10-11`; CI PASS on run #249; live provider integration NOT RUN**
 
 ## Scope
 
-This change adds `nexus.router.ToolRouter`, an adapter-based execution boundary. It does not add provider credentials, discover account quotas by itself, or claim that any external model is connected. A real integration must implement the adapter contract and supply truthful preflight results.
+This change adds `nexus.router.ToolRouter`, an adapter-based execution boundary. The reviewed implementation is now copied into the dedicated work branch; PR #3 itself remains open and unchanged. It does not add provider credentials, discover account quotas by itself, or claim that any external model is connected. A real integration must implement the adapter contract and supply truthful preflight results.
 
 ## Routing rules
 
@@ -39,11 +39,11 @@ Raise `ProviderError(code, message, fallback_safe=True)` only when the error is 
 
 ## Remaining verification
 
-- CI status must be recorded from the actual branch/PR checks; do not infer it from earlier commits.
+- GitHub Actions run [#249](https://github.com/Prasong1993/Loop-Controller/actions/runs/38076731270) passed on Python 3.11, 3.12 and 3.13 for work-branch commit `188a604f498abb5986600a182e04354b1daadb8a` (4 OpenAPI contract tests + 94 unit tests per matrix job). This verifies mock-backed tests only.
 - No real provider adapter or live quota endpoint is included in this change.
 - No API key or provider account is called by the mock-backed unit tests.
 - Durable router-stage checkpoints are wired to the existing SQLite controller and covered by a test that reads back checkpoint rows and audit events.
-- Production behavior, rate limits, and live fallback remain **NOT_RUN / UNKNOWN** until exercised against an authorized provider integration. This does not block source review, static contract checks, mock-backed tests, or unrelated implementation work. Each skipped live check must be logged with a reason, and all runnable checks should continue.
+- Production behavior, rate limits, and live fallback remain **NOT RUN / UNKNOWN** until exercised against an authorized provider integration. The router is currently a Python module and is not wired to a configured live provider endpoint; do not claim live execution. This does not block source review, static contract checks, mock-backed tests, or unrelated implementation work. Each skipped live check must be logged with a reason, and all runnable checks should continue.
 
 
 ## Automatic per-round execution logging
