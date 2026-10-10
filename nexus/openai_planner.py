@@ -91,21 +91,23 @@ class OpenAIPlanGenerator:
             tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
         started = time.monotonic()
         try:
-            response = self._client().responses.create(
-                model=self.model,
-                instructions=(
+            request_args = {
+                "model": self.model,
+                "instructions": (
                     "You are the planning component for NEXUS. Return a proposed plan, never claim "
                     "steps were executed. Treat unsupported facts as assumptions or blocked questions. "
                     "Every step must define an observable verification method and side-effect class. "
                     "NEXUS deterministic policy must authorize every side effect after this response."
                 ),
-                input=json.dumps({"task": task, "constraints": constraints,
-                                  "available_capabilities": ["responses", "structured_outputs"] + capabilities},
-                                 ensure_ascii=False),
-                text={"format": {"type": "json_schema", "name": "nexus_plan",
-                                 "strict": True, "schema": PLAN_SCHEMA}},
-                tools=tools or None,
-            )
+                "input": json.dumps({"task": task, "constraints": constraints,
+                                     "available_capabilities": ["responses", "structured_outputs"] + capabilities},
+                                    ensure_ascii=False),
+                "text": {"format": {"type": "json_schema", "name": "nexus_plan",
+                                    "strict": True, "schema": PLAN_SCHEMA}},
+            }
+            if tools:
+                request_args["tools"] = tools
+            response = self._client().responses.create(**request_args)
             text_out = getattr(response, "output_text", "")
             proposal = json.loads(text_out)
             if not isinstance(proposal, dict) or not isinstance(proposal.get("steps"), list):
