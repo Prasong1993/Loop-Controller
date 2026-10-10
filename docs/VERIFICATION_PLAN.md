@@ -157,3 +157,23 @@ Commit: `6e5dcfcd46d2781a315bfefdfa6dbcfd34b53bea`.
 This run covers code proposal generation and path safety, model/capability gating, task/project scope checks, REST operational-record correlation/search, task-scoped evidence, additive database migration, pinned HTTPS transport, double budget gates, structured plan proposals, read-only OpenAI tool policy, and the in-process REST lifecycle.
 
 The subsequent change to README/docs is documentation-only; the next workflow run must still be checked before finalizing the full repository snapshot. Live OpenAI calls, code writes/execution, production deployment/authentication and ChatGPT Android integration remain NOT RUN/BLOCKED.
+
+
+## Latest contract + redaction verification — 2026-10-10
+**GitHub Actions run #174:** https://github.com/Prasong1993/Loop-Controller/actions/runs/38015687274  
+Commit: `7fb87b41ffb8ff91656e60067ba3bf9354fbd367`.
+
+| Runtime | OpenAPI contract checks | Full suite | Result |
+|---|---|---|---|
+| Python 3.11 | 4 checks PASS | 73 tests PASS | PASS |
+| Python 3.12 | 4 checks PASS | 73 tests PASS | PASS |
+| Python 3.13 | 4 checks PASS | 73 tests PASS | PASS |
+
+The workflow now parses OpenAPI YAML, checks runtime/OpenAPI version alignment, requires the controller routes to be documented, verifies direct evidence cannot claim VERIFIED, and checks code proposal path-scoping contract. The record store also rejects credential/raw-content keys recursively while allowing redacted token counts and content hashes.
+
+Remote deployment, live OpenAI provider access, code writing/execution, production auth/tenant isolation and ChatGPT Android integration remain NOT RUN/BLOCKED.
+
+| Test ID | Scenario | Evidence | Latest disposition |
+|---|---|---|---|
+| NXT-046 | OpenAPI YAML parses; API version and routes match; safety contract remains documented | `tests/test_openapi_contract.py` | PASS in CI #174 |
+| NXT-047 | Operational record store rejects nested credentials and raw prompt/code content but allows hashes/token counts | `tests/test_records.py` | PASS in CI #174 |
