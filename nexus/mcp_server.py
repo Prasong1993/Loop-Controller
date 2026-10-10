@@ -54,6 +54,10 @@ def track_tool(fn):
                 status="STARTED",summary=f"MCP tool {fn.__name__} started",
                 payload={"operation":fn.__name__,"phase":"TOOL_STARTED"})
             if principal and fn.__name__!="nexus_health":
+                if fn.__name__=="nexus_transition_task":
+                    kwargs["actor"]=principal
+                if fn.__name__=="nexus_record_verification" and values.get("verifier")!=principal:
+                    raise PolicyDenied("verifier must match the authenticated principal")
                 scoped_project=str(values.get("project_id") or "")
                 if task_id:
                     task_row=controller.get_task(str(task_id))
