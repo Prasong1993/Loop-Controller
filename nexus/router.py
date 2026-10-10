@@ -57,10 +57,14 @@ class ToolRouter:
 
     def __init__(
         self,
+        controller: Any,
         *,
         audit_sink: Callable[[Mapping[str, Any]], None] | None = None,
         checkpoint_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
+        if controller is None or not callable(getattr(controller, "record_router_checkpoint", None)):
+            raise ValueError("a persistent controller with record_router_checkpoint() is required")
+        self._controller = controller
         self._audit_sink = audit_sink
         self._checkpoint_sink = checkpoint_sink
 
@@ -82,7 +86,14 @@ class ToolRouter:
                 self._audit_sink(event)
 
         def checkpoint(stage: str, **details: Any) -> None:
-            item = {"stage": stage, "task_id": task.get("task_id"), **details}
+            task_id = task.get("task_id")
+            if not task_id:
+                raise ValueError("task.task_id is required for durable checkpoints")
+            item = {"stage": stage, "task_id": task_id, **details}
+            # Persistence is mandatory and happens before routing can proceed.
+            # If SQLite write fails, the exception stops the route before execution.
+            saved = self._controller.record_router_checkpoint(task_id, item)
+            item["checkpoint_id"] = saved["checkpoint_id"]
             checkpoints.append(item)
             if self._checkpoint_sink:
                 self._checkpoint_sink(item)
