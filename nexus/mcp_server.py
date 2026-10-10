@@ -85,7 +85,7 @@ class BearerGateMiddleware:
     def __init__(self,app:ASGIApp):
         self.app=app
     async def __call__(self,scope:Scope,receive:Receive,send:Send):
-        if scope["type"] not in {"http","websocket"}:
+        if scope["type"] != "http":
             await self.app(scope,receive,send); return
         headers={k.lower():v.decode("latin1") for k,v in scope.get("headers",[])}
         auth=headers.get(b"authorization".lower(),"")
