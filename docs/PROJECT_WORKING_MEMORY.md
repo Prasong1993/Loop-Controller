@@ -100,3 +100,28 @@ The following are acceptance requirements, not claims of existing implementation
 ## 10. Operating rule for future work
 
 Before coding, retrieve this file and the current repository evidence. Update this file only when there is a meaningful new decision, verified implementation status, test result, risk, or unresolved blocker. Keep it concise and current; do not turn it into a raw research dump. Record code changes and test results with links/commit references where available.
+
+## 11. Parallel execution and multi-tool orchestration
+
+Parallel execution is the default when tasks are independent and the connected tools support concurrent calls. Do not serialize work merely because a sequential workflow is familiar or easier to describe.
+
+- Decompose each request into small work units; identify dependencies, shared-file conflicts, ordering constraints, permissions, and irreversible side effects before dispatch.
+- Run independent research, repository inspection, test preparation, status checks, and storage checks concurrently where appropriate. Select tools by capability and evidence quality, not habit; use all relevant connected tools when they add value.
+- Keep dependent operations ordered. For example, do not publish or back up a new artifact before its content/version is finalized when the backup is expected to represent that exact revision.
+- Avoid concurrent writes to the same file, branch, database row, or mutable resource unless the operation is explicitly safe and conflict-controlled. Use separate work units/branches or serialize only the conflicting writes.
+- Give each work unit a clear input, expected output, owner/tool, dependency list, and completion criterion. Collect results at a coordination point and reconcile conflicting evidence before taking dependent actions.
+- For cross-service work (such as GitHub plus Dropbox), treat each service as a separate result: confirm each write/readback independently, compare revision identifiers or content hashes when feasible, and report partial success honestly. One service succeeding does not imply the other succeeded.
+- Record parallel task/run IDs, start/end times, dependencies, tool calls, outputs, retries, failures, and final reconciliation in the audit trail. Mark unlaunched or unsupported work NOT_RUN/BLOCKED rather than implying it ran.
+- Use bounded concurrency and respect rate limits, quotas, API budgets, and provider/tool restrictions. Do not duplicate a call after a warning unless the warning and retry policy permit it.
+- Parallelize independent work; sequence only where a real dependency, safety gate, shared-resource conflict, or approval requirement demands it. The objective is lower elapsed time without reducing traceability, correctness, or user control.
+- Do not claim permanent background execution or automatic cross-service synchronization unless that automation has actually been configured and tested.
+
+### Parallel-work acceptance criteria
+
+- [ ] The plan explicitly identifies parallelizable tasks and dependencies before execution.
+- [ ] Independent tool calls are dispatched concurrently when supported and beneficial.
+- [ ] Shared-resource writes and irreversible actions have explicit conflict/order controls.
+- [ ] Results from every dispatched work unit are collected and independently checked.
+- [ ] Partial failures and NOT_RUN/BLOCKED work are visible in the final report.
+- [ ] A benchmark or execution log can compare elapsed time and correctness against an unnecessarily sequential baseline when useful.
+
