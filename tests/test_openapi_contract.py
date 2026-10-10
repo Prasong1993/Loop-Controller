@@ -22,6 +22,7 @@ class OpenAPIContractTests(unittest.TestCase):
             "/projects/{project_id}/status":{"get"},
             "/tasks":{"post"},
             "/tasks/{task_id}":{"get"},
+            "/tasks/{task_id}/dependencies":{"get","post"},
             "/tasks/{task_id}/transition":{"post"},
             "/tasks/{task_id}/checkpoint":{"post"},
             "/tasks/{task_id}/restore":{"post"},
