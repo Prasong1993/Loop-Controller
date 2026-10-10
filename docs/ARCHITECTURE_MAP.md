@@ -10,6 +10,8 @@ NEXUS is a controller layer, not a replacement for OpenAI models or the ChatGPT 
 
 Any missing permission, required evidence, budget approval, tool registration or verification result routes to `BLOCKED` or a targeted `RECOVER`; it must not be silently treated as success.
 
+Capability enablement is centralized in `nexus/capabilities.py`; see [OpenAI Capability Matrix](OPENAI_CAPABILITY_MATRIX.md). The registry deliberately enables only model-verified tools and leaves code execution, computer use and patch application disabled until their runtime and policy contracts are proven.
+
 ## 3. Component connection map
 
 | Component | Owns | Inputs | Outputs / next connection | Must not own |
@@ -47,10 +49,10 @@ Any missing permission, required evidence, budget approval, tool registration or
 ## 6. Known integration gaps to close before release
 - Validate every REST and MCP tool mapping against current schemas and tests.
 - Prove core evidence verification cannot be bypassed through any endpoint, MCP tool or direct method.
-- Close DNS rebinding/TOCTOU, redirect, IPv4/IPv6 and TLS tests for evidence retrieval.
+- Expand source-fetch tests with adversarial live DNS/IPv4/IPv6 and TLS cases; unit tests currently prove the connection uses the pinned validated IP and original TLS hostname, but do not establish production network resilience.
 - Align REST/MCP health version with `nexus/version.py`.
 - Ensure tool instrumentation covers every exported MCP tool and does not leak arguments/secrets.
-- Add lifecycle end-to-end tests, malformed tool-call tests, cross-project denial tests, request validation, concurrency/idempotency and recovery tests.
+- Expand malformed tool-call, concurrency/idempotency and recovery tests; an in-process REST lifecycle and cross-project tool/evidence denial tests now pass in CI.
 - Run CI on the exact final commit and inspect failed job logs; do not infer a pass from a previous commit.
 - Public deployment, ChatGPT app registration and Android/mobile invocation remain unverified until tested live.
 
