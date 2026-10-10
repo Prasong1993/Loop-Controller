@@ -92,3 +92,12 @@ The following remain open before production: authentication/authorization, TLS, 
 - Added architecture map and Anchor reference-only boundary documents; Anchor source workflow and schema were not copied.
 - Added/expanded regression tests. **Do not mark tests PASS until the latest GitHub Actions run is complete and its jobs are inspected.**
 - Still RELEASE BLOCKED: shared bearer token/tenant authorization, deployment/TLS/secrets, concurrency/idempotency, task-level evidence traceability, and account-specific ChatGPT MCP/mobile integration are unresolved.
+
+
+## Verified regression result — 2026-10-10
+GitHub Actions run #121: https://github.com/Prasong1993/Loop-Controller/actions/runs/38014779739
+- Python 3.11: compile PASS; 58 tests PASS.
+- Python 3.12: compile PASS; 58 tests PASS.
+- Python 3.13: compile PASS; 58 tests PASS.
+- Added coverage includes task-specific evidence isolation and migration, pinned HTTPS transport, REST lifecycle completion/audit, paid budget gates, read-only OpenAI tool scope, usage records and MCP bearer-gate tests.
+- This does not prove live provider account access, remote deployment, production auth/tenant isolation, adversarial network resilience, or ChatGPT mobile integration.
