@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "provider": "openai",
+  "selection_policy": {
+    "primary_interface": "responses_api",
+    "model_selects_tools": true,
+    "policy_engine": "nexus_deterministic",
+    "execute_without_policy_allow": false,
+    "prefer_least_capability_needed": true,
+    "paid_actions_require_explicit_approval": true,
+    "unknown_capability_state": "BLOCKED"
+  },
+  "capabilities": [
+    {"id":"responses_api","kind":"model_runtime","enabled_by_default":true,"purpose":"Primary model request/response and tool orchestration","requires":"OPENAI_API_KEY","gate":"provider_call_policy"},
+    {"id":"function_calling","kind":"tool_protocol","enabled_by_default":true,"purpose":"Propose calls to explicitly registered external functions","requires":"registered_tool_schema","gate":"nexus_policy_before_execution"},
+    {"id":"structured_outputs","kind":"output_contract","enabled_by_default":true,"purpose":"Constrain model output to a JSON schema","requires":"supported_model_and_schema","gate":"schema_validation"},
+    {"id":"web_search","kind":"research_tool","enabled_by_default":false,"purpose":"Discover current public web sources","requires":"supported_responses_tool","gate":"evidence_verification"},
+    {"id":"file_search","kind":"retrieval_tool","enabled_by_default":false,"purpose":"Retrieve from explicitly indexed files","requires":"vector_store_and_access_scope","gate":"project_scope"},
+    {"id":"code_interpreter","kind":"sandbox_tool","enabled_by_default":false,"purpose":"Run supported Python analysis in hosted sandbox","requires":"supported_responses_tool","gate":"data_classification_and_task_policy"},
+    {"id":"agents_sdk","kind":"orchestration","enabled_by_default":false,"purpose":"Optional agent loop, handoffs, guardrails and tracing","requires":"official_python_sdk_and_review","gate":"nexus_policy_remains_authoritative"},
+    {"id":"mcp","kind":"integration_protocol","enabled_by_default":false,"purpose":"Connect external tool servers through MCP","requires":"supported_client_and_server_transport","gate":"server_auth_and_tool_policy"},
+    {"id":"apps_sdk","kind":"chatgpt_app_surface","enabled_by_default":false,"purpose":"Build app logic and optional UI for supported ChatGPT clients","requires":"supported_workspace_and_developer_mode","gate":"platform_availability_and_live_acceptance"},
+    {"id":"shell","kind":"code_execution","enabled_by_default":false,"purpose":"Run commands only in a specifically configured sandbox/runtime","requires":"isolated_execution_adapter","gate":"command_policy_and_resource_limits"},
+    {"id":"apply_patch","kind":"code_editing","enabled_by_default":false,"purpose":"Apply constrained patches to authorized source files","requires":"repository_adapter_and_diff_validation","gate":"scope_check_and_tests"},
+    {"id":"computer_use","kind":"computer_interaction","enabled_by_default":false,"purpose":"Operate a supported computer environment","requires":"supported_environment_and_explicit_scope","gate":"human_approval_for_sensitive_actions"},
+    {"id":"image_generation","kind":"media","enabled_by_default":false,"purpose":"Generate or edit images when the task requires images","requires":"supported_image_tool","gate":"content_and_output_policy"},
+    {"id":"audio_realtime","kind":"media","enabled_by_default":false,"purpose":"Audio input/output and realtime interaction","requires":"supported_audio_endpoint_and_client","gate":"consent_and_data_policy"},
+    {"id":"embeddings","kind":"retrieval_infrastructure","enabled_by_default":false,"purpose":"Vectorize text for semantic retrieval","requires":"embedding_model_and_storage","gate":"project_data_scope"},
+    {"id":"moderation","kind":"safety","enabled_by_default":false,"purpose":"Classify supported content for safety workflows","requires":"moderation_endpoint","gate":"safety_policy"},
+    {"id":"tracing","kind":"observability","enabled_by_default":false,"purpose":"Trace model and tool workflow execution","requires":"supported_sdk_or_trace_backend","gate":"redaction_and_retention_policy"}
+  ]
+}
