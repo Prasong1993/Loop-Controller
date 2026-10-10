@@ -99,27 +99,30 @@ class NexusApiTests(unittest.TestCase):
 
     def test_ai_plan_is_blocked_without_explicit_paid_budget_approval(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
-            response=self.client.post("/ai/plan",json={"project_id":"p-test","task":"draft a plan","budget_approved":True},
+            project=self.client.post("/projects",json={"name":"ai-plan-budget"},headers={"Authorization":"Bearer test-secret"}).json()
+            response=self.client.post("/ai/plan",json={"project_id":project["project_id"],"task":"draft a plan","budget_approved":True},
                                       headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,403)
         self.assertEqual(response.json()["detail"]["code"],"OPENAI_BUDGET_APPROVAL_REQUIRED")
 
     def test_ai_run_is_blocked_without_explicit_paid_budget_approval(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
-            response=self.client.post("/ai/run",json={"project_id":"p-test","prompt":"read status","budget_approved":True},
+            project=self.client.post("/projects",json={"name":"ai-run-budget"},headers={"Authorization":"Bearer test-secret"}).json()
+            response=self.client.post("/ai/run",json={"project_id":project["project_id"],"prompt":"read status","budget_approved":True},
                                       headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,403)
 
     def test_record_search_endpoint_returns_scoped_page(self):
         from nexus.api import record_store
-        record_store.append(project_id="search-test",record_type="usage",payload={"operation":"unit-test"},
-                            summary="search endpoint test")
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
-            response=self.client.get("/records/search?project_id=search-test&record_type=usage",
+            project=self.client.post("/projects",json={"name":"search-test"},headers={"Authorization":"Bearer test-secret"}).json()
+            record_store.append(project_id=project["project_id"],record_type="usage",payload={"operation":"unit-test"},
+                                summary="search endpoint test")
+            response=self.client.get(f"/records/search?project_id={project['project_id']}&record_type=usage",
                                      headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,200)
         self.assertGreaterEqual(response.json()["total"],1)
-        self.assertEqual(response.json()["project_id"],"search-test")
+        self.assertEqual(response.json()["project_id"],project["project_id"])
 
 
     def test_evidence_quote_mismatch_maps_to_422(self):
@@ -145,8 +148,9 @@ class NexusApiTests(unittest.TestCase):
                 return {"response_id":"fake-response","output_text":"blocked","tool_calls":[],
                         "policy_decisions":[seen["decision"]],"rounds":1,"usage":{}}
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            active=self.client.post("/projects",json={"name":"active-project"},headers={"Authorization":"Bearer test-secret"}).json()
             with patch("nexus.api.OpenAIResponsesWorker", FakeWorker):
-                response=self.client.post("/ai/run",json={"project_id":"active-project",
+                response=self.client.post("/ai/run",json={"project_id":active["project_id"],
                     "prompt":"read status","budget_approved":True},
                     headers={"Authorization":"Bearer test-secret","x-request-id":"test-trace-01"})
         self.assertEqual(response.status_code,200)
@@ -156,7 +160,7 @@ class NexusApiTests(unittest.TestCase):
             "nexus_get_project_status","nexus_read_audit","nexus_get_task"})
         self.assertEqual(response.json()["trace_id"],"test-trace-01")
         from nexus.api import record_store
-        scoped=record_store.search(project_id="active-project",record_type="usage",component="rest_api")
+        scoped=record_store.search(project_id=active["project_id"],record_type="usage",component="rest_api")
         self.assertGreaterEqual(scoped["total"],1)
         self.assertTrue(any(row["trace_id"]=="test-trace-01" for row in scoped["records"]))
 
