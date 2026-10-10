@@ -13,6 +13,11 @@ services:
     restart: unless-stopped
   mcp:
     build: .
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     command: ["uvicorn", "nexus.mcp_server:app", "--host", "0.0.0.0", "--port", "8001"]
     env_file: .env
     environment:
