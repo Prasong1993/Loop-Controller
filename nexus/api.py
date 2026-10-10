@@ -13,6 +13,7 @@ from nexus.records import RecordStore
 from nexus.authorization import ProjectAuthorization
 from nexus.idempotency import IdempotencyStore, IdempotencyConflict, IdempotencyInProgress
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from nexus.core import NEXUS, PolicyDenied
 from nexus.evidence import EvidenceFetchError
@@ -30,14 +31,42 @@ project_authorization=ProjectAuthorization(os.getenv("NEXUS_AUTHZ_DB",os.getenv(
 plan_generator=OpenAIPlanGenerator(record_store)
 code_proposal_generator=OpenAICodeProposalGenerator(record_store)
 
+_rate_limit_state={}
 @app.middleware("http")
 async def operational_record_middleware(request: Request, call_next):
-    """Capture every REST request outcome without storing raw bodies or secrets."""
+    """Rate-limit requests and persist a mandatory start record before business execution."""
     started=time.monotonic()
     trace_id=request.headers.get("x-request-id","").strip()
     if not trace_id or len(trace_id)>128:
         trace_id=str(uuid.uuid4())
     request.state.trace_id=trace_id
+    host=request.client.host if request.client else "unknown"
+    now=time.monotonic()
+    try:
+        limit=max(1,int(os.getenv("NEXUS_RATE_LIMIT_PER_MINUTE","120")))
+    except ValueError:
+        return JSONResponse(status_code=503,content={"code":"RATE_LIMIT_CONFIG_INVALID"})
+    window,count=_rate_limit_state.get(host,(now,0))
+    if now-window>=60:
+        window,count=now,0
+    if count>=limit:
+        try:
+            record_store.append(project_id="system",record_type="error",trace_id=trace_id,
+                actor_type="system",component="rest_api",status="BLOCKED",error_code="RATE_LIMIT_EXCEEDED",
+                severity="medium",summary="REST request rejected by rate limiter",
+                payload={"method":request.method,"path":request.url.path,"retryable":True,"http_status":429})
+        except Exception:
+            return JSONResponse(status_code=503,content={"code":"MANDATORY_AUDIT_UNAVAILABLE"})
+        return JSONResponse(status_code=429,content={"code":"RATE_LIMIT_EXCEEDED","retry_after_seconds":max(1,int(60-(now-window)))})
+    _rate_limit_state[host]=(window,count+1)
+    try:
+        record_store.append(project_id="system",record_type="usage",trace_id=trace_id,
+            actor_type="system",component="rest_api",status="STARTED",
+            summary=f"{request.method} {request.url.path} request accepted for processing",
+            payload={"operation":request.method,"path":request.url.path,"phase":"REQUEST_STARTED"})
+    except Exception:
+        return JSONResponse(status_code=503,content={"code":"MANDATORY_AUDIT_UNAVAILABLE",
+            "message":"Request was not executed because mandatory start-audit persistence failed."})
     try:
         response=await call_next(request)
         status_code=response.status_code
@@ -276,10 +305,20 @@ async def require_project_access(request:Request, authorization:str|None=Header(
         # Preserve 404 for unknown project IDs to avoid revealing tenant existence.
         try:
             controller.status(project_id)
-        except ValueError:
-            return principal
+        except ValueError as exc:
+            raise HTTPException(status_code=404,detail="unknown project_id") from exc
         raise HTTPException(status_code=403,detail={"code":"PROJECT_ACCESS_DENIED","message":"Principal is not a member of this project."})
     return principal
+
+def ensure_project_access(project_id:str,request:Request)->None:
+    principal=getattr(request.state,"principal","")
+    if project_authorization.has_access(project_id,principal):
+        return
+    try:
+        controller.status(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404,detail="unknown project_id") from exc
+    raise HTTPException(status_code=403,detail={"code":"PROJECT_ACCESS_DENIED","message":"Principal is not a member of this project."})
 
 def invoke(fn,*args,**kwargs):
     try: return fn(*args,**kwargs)
@@ -301,28 +340,29 @@ def create_project(body:ProjectIn,request:Request):
     return result
 @app.get("/projects/{project_id}/status",dependencies=[Depends(require_project_access)])
 def project_status(project_id:str): return invoke(controller.status,project_id)
-@app.post("/tasks",status_code=201,dependencies=[Depends(require_api_key)])
+@app.post("/tasks",status_code=201,dependencies=[Depends(require_project_access)])
 def create_task(body:TaskIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     result=invoke(controller.create_task,body.project_id,body.title,body.expected_outcome,body.verification_method)
     request.state.task_id=result["task_id"]
     return result
-@app.get("/tasks/{task_id}",dependencies=[Depends(require_api_key)])
+@app.get("/tasks/{task_id}",dependencies=[Depends(require_project_access)])
 def get_task(task_id:str): return invoke(controller.get_task,task_id)
-@app.post("/tasks/{task_id}/dependencies",status_code=201,dependencies=[Depends(require_api_key)])
+@app.post("/tasks/{task_id}/dependencies",status_code=201,dependencies=[Depends(require_project_access)])
 def add_task_dependency(task_id:str,body:DependencyIn,request:Request):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
     request.state.task_id=task_id
     return invoke(controller.add_task_dependency,task_id,body.depends_on_task_id,"api")
 
-@app.get("/tasks/{task_id}/dependencies",dependencies=[Depends(require_api_key)])
+@app.get("/tasks/{task_id}/dependencies",dependencies=[Depends(require_project_access)])
 def get_task_dependencies(task_id:str,request:Request):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
     request.state.task_id=task_id
     return invoke(controller.get_task_dependencies,task_id)
-@app.post("/tasks/{task_id}/transition",dependencies=[Depends(require_api_key)])
+@app.post("/tasks/{task_id}/transition",dependencies=[Depends(require_project_access)])
 def transition(task_id:str,body:TransitionIn,request:Request,idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
@@ -351,32 +391,34 @@ def transition(task_id:str,body:TransitionIn,request:Request,idempotency_key:str
             raise
     return invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
 
-@app.post("/tasks/{task_id}/verification",dependencies=[Depends(require_api_key)])
+@app.post("/tasks/{task_id}/verification",dependencies=[Depends(require_project_access)])
 def record_task_verification(task_id:str,body:VerificationIn,request:Request):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
     request.state.task_id=task_id
     return invoke(controller.record_verification,task_id,body.verifier,body.evidence_id,body.result_sha256,body.notes)
 
-@app.get("/tasks/{task_id}/verification",dependencies=[Depends(require_api_key)])
+@app.get("/tasks/{task_id}/verification",dependencies=[Depends(require_project_access)])
 def get_task_verifications(task_id:str,request:Request):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
     request.state.task_id=task_id
     return invoke(controller.get_verifications,task_id)
-@app.post("/tasks/{task_id}/checkpoint",dependencies=[Depends(require_api_key)])
+@app.post("/tasks/{task_id}/checkpoint",dependencies=[Depends(require_project_access)])
 def checkpoint(task_id:str): return invoke(controller.checkpoint,task_id)
-@app.post("/tasks/{task_id}/restore",dependencies=[Depends(require_api_key)])
+@app.post("/tasks/{task_id}/restore",dependencies=[Depends(require_project_access)])
 def restore_checkpoint(task_id:str,body:RestoreIn):
     return invoke(controller.restore_checkpoint,task_id,body.checkpoint_id,body.actor,body.reason)
-@app.post("/evidence",dependencies=[Depends(require_api_key)])
+@app.post("/evidence",dependencies=[Depends(require_project_access)])
 def add_evidence(body:EvidenceIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     request.state.task_id=body.task_id
     return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes,body.task_id)
 
-@app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
+@app.post("/evidence/verify",dependencies=[Depends(require_project_access)])
 def verify_evidence(body:VerifyEvidenceIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     request.state.task_id=body.task_id
     try:
@@ -384,10 +426,10 @@ def verify_evidence(body:VerifyEvidenceIn,request:Request):
                      body.quoted_text,body.notes,"api-source-verifier",task_id=body.task_id)
     except EvidenceFetchError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
-@app.get("/projects/{project_id}/audit",dependencies=[Depends(require_api_key)])
+@app.get("/projects/{project_id}/audit",dependencies=[Depends(require_project_access)])
 def audit(project_id:str,task_id:str|None=None): return invoke(controller.audit,project_id,task_id)
 
-@app.get("/records/search",dependencies=[Depends(require_api_key)])
+@app.get("/records/search",dependencies=[Depends(require_project_access)])
 def search_records(request:Request,project_id:str,record_type:str|None=None,task_id:str|None=None,
                    trace_id:str|None=None,operation_id:str|None=None,status:str|None=None,
                    error_code:str|None=None,component:str|None=None,query:str|None=None,
@@ -400,8 +442,9 @@ def search_records(request:Request,project_id:str,record_type:str|None=None,task
     except ValueError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
 
-@app.post("/ai/plan",dependencies=[Depends(require_api_key)])
+@app.post("/ai/plan",dependencies=[Depends(require_project_access)])
 def propose_ai_plan(body:AIPlanIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     # A request-level checkbox alone cannot enable paid API usage: the deployment
     # operator must also set the server-side budget gate.
@@ -418,8 +461,9 @@ def propose_ai_plan(body:AIPlanIn,request:Request):
         raise HTTPException(status_code=422,detail=str(exc)) from exc
 
 
-@app.post("/ai/code-proposal",dependencies=[Depends(require_api_key)])
+@app.post("/ai/code-proposal",dependencies=[Depends(require_project_access)])
 def propose_code(body:AICodeProposalIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     request.state.task_id=body.task_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
@@ -450,8 +494,9 @@ _AI_READ_TOOLS=[
   "parameters":{"type":"object","properties":{"project_id":{"type":"string"},"task_id":{"type":"string"}},"required":["project_id","task_id"],"additionalProperties":False},"strict":True}
 ]
 
-@app.post("/ai/run",dependencies=[Depends(require_api_key)])
+@app.post("/ai/run",dependencies=[Depends(require_project_access)])
 def run_ai_with_read_tools(body:AIRunIn,request:Request):
+    ensure_project_access(body.project_id,request)
     request.state.project_id=body.project_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
     if not (body.budget_approved and budget_gate):
@@ -507,5 +552,5 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         raise HTTPException(status_code=502,detail={"code":"OPENAI_WORKER_FAILED","message":str(exc)}) from exc
     except PolicyDenied as exc:
         raise HTTPException(status_code=403,detail={"code":"POLICY_DENIED","message":str(exc)}) from exc
-@app.post("/policy/route",dependencies=[Depends(require_api_key)])
+@app.post("/policy/route",dependencies=[Depends(require_project_access)])
 def route(body:RouteIn): return controller.policy_route(body.candidates,body.allow_paid,body.budget_approved)
