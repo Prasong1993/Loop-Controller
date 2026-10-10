@@ -92,12 +92,14 @@ class EvidenceIn(BaseModel):
     status:str
     source_url:str|None=None
     notes:str=""
+    task_id:str|None=None
 class VerifyEvidenceIn(BaseModel):
     project_id:str
     claim:str=Field(min_length=1,max_length=2000)
     source_url:str=Field(min_length=1,max_length=2000)
     quoted_text:str=Field(min_length=1,max_length=5000)
     notes:str=""
+    task_id:str|None=None
 class TransitionIn(BaseModel):
     to_state:str
     actor:str="api"
@@ -168,13 +170,13 @@ def restore_checkpoint(task_id:str,body:RestoreIn):
     return invoke(controller.restore_checkpoint,task_id,body.checkpoint_id,body.actor,body.reason)
 @app.post("/evidence",dependencies=[Depends(require_api_key)])
 def add_evidence(body:EvidenceIn):
-    return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes)
+    return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes,body.task_id)
 
 @app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
 def verify_evidence(body:VerifyEvidenceIn):
     try:
         return invoke(controller.verify_and_add_evidence,body.project_id,body.claim,body.source_url,
-                     body.quoted_text,body.notes,"api-source-verifier")
+                     body.quoted_text,body.notes,"api-source-verifier",task_id=body.task_id)
     except EvidenceFetchError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
 @app.get("/projects/{project_id}/audit",dependencies=[Depends(require_api_key)])
