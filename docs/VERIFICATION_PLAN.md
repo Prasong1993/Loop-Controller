@@ -85,3 +85,10 @@ Do not confuse opening the ChatGPT app with proof that NEXUS is connected. CI su
 | NXT-028 | Unknown task identifier | HTTP 404 | `tests/test_api.py` |
 
 These are test definitions in source. Mark PASS only after the latest GitHub Actions run reports success.
+
+
+| NXT-029 | Remote MCP request without configured token | Fail closed with 503 | `tests/test_mcp_server.py` |
+| NXT-030 | MCP request with missing/invalid token | Deny before dispatch | `tests/test_mcp_server.py` |
+| NXT-031 | Source quote absent from fetched text | Do not record VERIFIED | `tests/test_evidence.py` |
+| NXT-032 | HTTP/local URL supplied as source | Reject before fetch | `tests/test_evidence.py` |
+| NXT-033 | Direct evidence API attempts status VERIFIED | Deny; require verification endpoint | `tests/test_api.py` |
