@@ -190,6 +190,15 @@ class ToolRouterTests(unittest.TestCase):
         self.assertIn("ROUTE_COMPLETED", kinds)
         self.assertEqual(json.loads(run["outcome_json"])["verified"], True)
 
+    def test_checkpoint_persistence_failure_stops_before_provider_execution(self):
+        adapter = FakeAdapter()
+        def fail_checkpoint(task_id, snapshot, actor="tool-router"):
+            raise OSError("checkpoint ledger unavailable")
+        self.controller.record_router_checkpoint = fail_checkpoint
+        with self.assertRaisesRegex(OSError, "checkpoint ledger unavailable"):
+            self.route([candidate("free", adapter)])
+        self.assertEqual(adapter.calls, 0)
+
     def test_missing_task_id_stops_before_provider_execution(self):
         adapter = FakeAdapter()
         with self.assertRaisesRegex(ValueError, "task.task_id is required"):
