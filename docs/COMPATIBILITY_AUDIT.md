@@ -130,7 +130,7 @@ This update records source changes made after the initial static audit. It does 
 | NX-A01 — forged VERIFIED evidence via caller-supplied source text | Core legacy method now denies caller-supplied source text; `verify_and_add_evidence` fetches and matches a quote inside the trusted core boundary; project existence is checked before outbound fetch. | FIX IMPLEMENTED; unit/CI status must be checked on the latest commit. |
 | NX-A02 — DNS validation/connection TOCTOU | HTTPS fetch uses a pinned validated public IP and TLS hostname verification; redirects remain blocked; body and timeout bounds remain. | FIX IMPLEMENTED; current unit tests cover handler type and private DNS denial; no live adversarial network test. |
 | NX-A03 — version mismatch | REST and MCP health read `nexus/version.py` (0.4.0). | STATIC READ-BACK REQUIRED; CI check pending. |
-| NX-A04 — no end-to-end lifecycle/API contract verification | Added evidence-boundary, budget-gate, record-search, OpenAI tool-scope and usage-accounting tests. | PARTIAL; no remote E2E, live provider call or ChatGPT mobile invocation. |
+| NX-A04 — no end-to-end lifecycle/API contract verification | Added REST lifecycle through verified COMPLETE and audit readback, task-scope/migration, budget-gate, OpenAI tool-scope, source-transport and usage-accounting tests. | PARTIAL — CI run #121 passed 58 tests on Python 3.11/3.12/3.13; no remote E2E, live provider call or ChatGPT mobile invocation. |
 | NX-A05 — inconsistent error mapping | `EvidenceFetchError` maps to HTTP 422 before generic `ValueError`; common error mapping remains incomplete for all REST/MCP paths. | PARTIAL. |
 | NX-A06 — evidence not tied to task/claim requirements | Added optional task_id to evidence; task-specific VERIFIED evidence satisfies only the linked task's PLAN gate; project-wide evidence remains explicit via null task_id. Cross-project task links are denied and old SQLite schemas migrate. | PARTIAL — requirement/claim ID linkage and freshness gate remain OPEN. |
 | NX-A07 — validation/record query hardening | Some request length limits and pagination checks exist; whitespace-only validation, filter/date validation, request body limits and audit payload policy need further review. | OPEN. |
@@ -146,3 +146,7 @@ OpenAI wiring now separates structured proposal generation from a read-only tool
 - `PLAN` gate counts VERIFIED evidence for the current task plus explicitly project-wide VERIFIED evidence only; a different task's evidence cannot satisfy the gate.
 - REST and MCP evidence tools accept optional `task_id`; OpenAPI reflects this.
 - Regression coverage includes cross-task denial, cross-project link denial, and legacy schema migration. Final disposition depends on latest CI result.
+
+
+## Verified regression run
+GitHub Actions run #121 (commit `a3b898e0437490887046e7629465995f5c959e84`) completed successfully: compile + 58 unit/regression tests on each of Python 3.11, 3.12 and 3.13. Details: https://github.com/Prasong1993/Loop-Controller/actions/runs/38014779739. This is workspace CI evidence, not production or ChatGPT integration evidence.
