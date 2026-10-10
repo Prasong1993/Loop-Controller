@@ -69,6 +69,17 @@ class NEXUS:
               PRIMARY KEY(task_id,depends_on_task_id),
               CHECK(task_id <> depends_on_task_id)
             );
+            CREATE TABLE IF NOT EXISTS verification_records(
+              verification_id TEXT PRIMARY KEY,
+              task_id TEXT NOT NULL REFERENCES tasks(task_id),
+              verifier TEXT NOT NULL,
+              passed INTEGER NOT NULL CHECK(passed IN (0,1)),
+              evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
+              result_sha256 TEXT NOT NULL DEFAULT '',
+              notes TEXT NOT NULL DEFAULT '',
+              created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_verification_task ON verification_records(task_id,created_at);
             CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
             CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);
             CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence(project_id);
@@ -243,14 +254,68 @@ class NEXUS:
                 """,(task_id,State.COMPLETE.value)).fetchall()
                 if pending:
                     raise PolicyDenied("EXECUTE requires all task dependencies to be COMPLETE")
-            if target==State.COMPLETE and (current!=State.AUDIT or not (result or row["result"]).strip()):
-                raise PolicyDenied("COMPLETE requires AUDIT state and a recorded result")
+            if target==State.COMPLETE:
+                if current!=State.AUDIT or not (result or row["result"]).strip():
+                    raise PolicyDenied("COMPLETE requires AUDIT state and a recorded result")
+                verified=con.execute("""
+                    SELECT v.verification_id FROM verification_records v
+                    JOIN evidence e ON e.evidence_id=v.evidence_id
+                    WHERE v.task_id=? AND v.passed=1 AND e.status='VERIFIED'
+                      AND e.project_id=? AND (e.task_id=? OR e.task_id IS NULL)
+                    ORDER BY v.created_at DESC LIMIT 1
+                """,(task_id,row["project_id"],task_id)).fetchone()
+                if not verified:
+                    raise PolicyDenied("COMPLETE requires a persisted passing verification linked to VERIFIED evidence")
             now=utc_now()
             con.execute("UPDATE tasks SET state=?,updated_at=?,result=COALESCE(?,result),error_code=COALESCE(?,error_code) WHERE task_id=?",
               (target.value,now,result,error_code,task_id))
             self._audit(con,row["project_id"],task_id,"STATE_TRANSITION",actor,reason or "No reason supplied",
                         current.value,target.value,{"error_code":error_code} if error_code else {})
             return dict(con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone())
+
+    def record_verification(self,task_id:str,verifier:str,evidence_id:str,
+                            result_sha256:str="",notes:str="")->dict[str,Any]:
+        """Persist and read back a passing verification linked to scoped VERIFIED evidence."""
+        if not verifier.strip():
+            raise PolicyDenied("verifier identity is required")
+        if result_sha256 and (len(result_sha256)!=64 or any(c not in "0123456789abcdefABCDEF" for c in result_sha256)):
+            raise ValueError("result_sha256 must be a 64-character hexadecimal SHA-256")
+        vid=str(uuid.uuid4())
+        with self._connect() as con:
+            task=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not task:
+                raise ValueError("unknown task_id")
+            if State(task["state"]) != State.VERIFY:
+                raise PolicyDenied("verification records can only be created in VERIFY state")
+            evidence=con.execute("""SELECT * FROM evidence WHERE evidence_id=? AND project_id=?
+                AND status='VERIFIED' AND (task_id=? OR task_id IS NULL)""",
+                (evidence_id,task["project_id"],task_id)).fetchone()
+            if not evidence:
+                raise PolicyDenied("verification must reference VERIFIED evidence scoped to this task or project")
+            created=utc_now()
+            con.execute("""INSERT INTO verification_records
+                (verification_id,task_id,verifier,passed,evidence_id,result_sha256,notes,created_at)
+                VALUES(?,?,?,?,?,?,?,?)""",
+                (vid,task_id,verifier.strip(),1,evidence_id,result_sha256.lower(),notes,created))
+            self._audit(con,task["project_id"],task_id,"VERIFICATION_RECORDED",verifier.strip(),
+                "Passing verification persisted and read back",State.VERIFY.value,State.VERIFY.value,
+                {"verification_id":vid,"evidence_id":evidence_id,"result_sha256":result_sha256.lower()})
+            row=con.execute("""SELECT v.*,e.status AS evidence_status,e.project_id AS evidence_project_id
+                FROM verification_records v JOIN evidence e ON e.evidence_id=v.evidence_id
+                WHERE v.verification_id=? AND v.task_id=?""",(vid,task_id)).fetchone()
+            if not row or not row["passed"] or row["evidence_status"]!="VERIFIED" or row["evidence_project_id"]!=task["project_id"]:
+                raise RuntimeError("verification persistence/read-back failed")
+            return dict(row)
+
+    def get_verifications(self,task_id:str)->list[dict[str,Any]]:
+        with self._connect() as con:
+            if not con.execute("SELECT 1 FROM tasks WHERE task_id=?",(task_id,)).fetchone():
+                raise ValueError("unknown task_id")
+            rows=con.execute("""SELECT v.verification_id,v.task_id,v.verifier,v.passed,v.evidence_id,
+                v.result_sha256,v.notes,v.created_at,e.status AS evidence_status
+                FROM verification_records v JOIN evidence e ON e.evidence_id=v.evidence_id
+                WHERE v.task_id=? ORDER BY v.created_at,v.verification_id""",(task_id,)).fetchall()
+            return [dict(row) for row in rows]
 
     def checkpoint(self,task_id:str)->dict[str,Any]:
         task=self.get_task(task_id); cid=str(uuid.uuid4())
