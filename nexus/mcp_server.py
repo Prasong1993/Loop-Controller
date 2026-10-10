@@ -82,36 +82,43 @@ def nexus_create_project(name:str)->dict:
     return controller.create_project(name)
 
 @mcp.tool()
+@track_tool
 def nexus_create_task(project_id:str,title:str,expected_outcome:str,verification_method:str)->dict:
     """Create a workflow task with explicit outcome and verification criteria."""
     return controller.create_task(project_id,title,expected_outcome,verification_method)
 
 @mcp.tool()
+@track_tool
 def nexus_get_task(task_id:str)->dict:
     """Read a task's current state and recorded result."""
     return controller.get_task(task_id)
 
 @mcp.tool()
+@track_tool
 def nexus_get_project_status(project_id:str)->dict:
     """Read project status, task counts and evidence counts."""
     return controller.status(project_id)
 
 @mcp.tool()
+@track_tool
 def nexus_transition_task(task_id:str,to_state:str,actor:str="chatgpt",reason:str="",result:str|None=None,error_code:str|None=None)->dict:
     """Request a policy-gated state transition. Policy denials must not be retried blindly."""
     return controller.transition(task_id,to_state,actor,reason,result,error_code)
 
 @mcp.tool()
+@track_tool
 def nexus_create_checkpoint(task_id:str)->dict:
     """Create an auditable checkpoint for a task."""
     return controller.checkpoint(task_id)
 
 @mcp.tool()
+@track_tool
 def nexus_restore_checkpoint(task_id:str,checkpoint_id:str,reason:str="Approved recovery")->dict:
     """Restore safe workflow metadata only from BLOCKED/RECOVER; EXECUTE checkpoints are never replayed."""
     return controller.restore_checkpoint(task_id,checkpoint_id,"chatgpt",reason)
 
 @mcp.tool()
+@track_tool
 def nexus_add_unverified_evidence(project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="")->dict:
     """Record RECOVERED, UNKNOWN or BLOCKED evidence. VERIFIED is prohibited here; use source quote verification."""
     if status=="VERIFIED":
@@ -119,6 +126,7 @@ def nexus_add_unverified_evidence(project_id:str,claim:str,status:str,source_url
     return controller.add_evidence(project_id,claim,status,source_url,notes)
 
 @mcp.tool()
+@track_tool
 def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_text:str,notes:str="")->dict:
     """Fetch a public HTTPS source and record VERIFIED only if the exact normalized quote exists."""
     proof=verify_source_quote(source_url,quoted_text)
@@ -126,6 +134,7 @@ def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_
                                             proof["source_text"],notes,"chatgpt-source-verifier")
 
 @mcp.tool()
+@track_tool
 def nexus_read_audit(project_id:str,task_id:str|None=None)->list[dict]:
     """Read audit events for a project, optionally filtered by task_id."""
     return controller.audit(project_id,task_id)
@@ -143,6 +152,7 @@ def nexus_search_records(project_id:str,record_type:str|None=None,task_id:str|No
         component=component,query=query,limit=limit,offset=offset)
 
 @mcp.tool()
+@track_tool
 def nexus_select_route(candidates:list[dict],allow_paid:bool=False,budget_approved:bool=False)->dict:
     """Select an eligible route; does not execute a provider. Paid routes need both approvals."""
     return controller.policy_route(candidates,allow_paid,budget_approved)
