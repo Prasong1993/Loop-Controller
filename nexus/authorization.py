@@ -41,3 +41,9 @@ class ProjectAuthorization:
                 (project_id,principal)).fetchone()
             return bool(row and row[0] in {"OWNER","MEMBER","READ_ONLY"})
 
+    def can_write(self,project_id:str,principal:str)->bool:
+        with self._connect() as con:
+            row=con.execute("SELECT role FROM project_members WHERE project_id=? AND principal=?",
+                (project_id,principal)).fetchone()
+            return bool(row and row[0] in {"OWNER","MEMBER"})
+
