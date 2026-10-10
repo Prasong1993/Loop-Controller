@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    command: ["uvicorn", "nexus.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: .env
+    environment:
+      NEXUS_DB: /app/data/nexus.db
+      NEXUS_RECORDS_DB: /app/data/nexus.db
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - nexus_data:/app/data
+    restart: unless-stopped
+  mcp:
+    build: .
+    command: ["uvicorn", "nexus.mcp_server:app", "--host", "0.0.0.0", "--port", "8001"]
+    env_file: .env
+    environment:
+      NEXUS_DB: /app/data/nexus.db
+      NEXUS_RECORDS_DB: /app/data/nexus.db
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - nexus_data:/app/data
+    restart: unless-stopped
+volumes:
+  nexus_data:

@@ -64,6 +64,9 @@ Recent code work adds OpenAI Responses API structured plans, allowlisted code-fi
 
 ## Scalable MCP extensions
 - Extension registry and configuration: `docs/MCP_EXTENSIBILITY.md`
+- [NASA-style review gates](docs/NASA_STYLE_REVIEW_GATES.md)
+- [Local quickstart and deployment boundaries](docs/QUICKSTART.md)
+- Docker Compose package: `Dockerfile`, `docker-compose.yml`, `.env.example`
 
 ## Controller adapters
 - MCP Streamable HTTP adapter: `nexus/mcp_server.py` (remote use requires secure HTTPS and configured `NEXUS_API_KEY`)

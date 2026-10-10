@@ -19,6 +19,7 @@ from nexus.records import RecordStore
 from nexus.evidence import EvidenceFetchError
 from nexus.version import VERSION
 from nexus.mcp_extensions import load_mcp_extensions
+from nexus.review_gates import evaluate_gate_readiness, list_review_gates
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
@@ -155,6 +156,19 @@ def nexus_search_records(project_id:str,record_type:str|None=None,task_id:str|No
 def nexus_select_route(candidates:list[dict],allow_paid:bool=False,budget_approved:bool=False)->dict:
     """Select an eligible route; does not execute a provider. Paid routes need both approvals."""
     return controller.policy_route(candidates,allow_paid,budget_approved)
+
+@mcp.tool()
+@track_tool
+def nexus_list_review_gates() -> list[dict]:
+    """List the NASA-style review gate sequence and required readiness criteria."""
+    return list_review_gates()
+
+@mcp.tool()
+@track_tool
+def nexus_review_gate_readiness(gate_id: str, prior_gate_statuses: list[dict],
+                                criteria_evidence: list[dict]) -> dict:
+    """Check whether evidence makes a review gate ready for independent review; never grants approval."""
+    return evaluate_gate_readiness(gate_id, prior_gate_statuses, criteria_evidence)
 
 # Optional server-admin configured extensions; loaded at startup and audited like built-in tools.
 load_mcp_extensions(mcp, track_tool)
