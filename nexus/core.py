@@ -292,6 +292,11 @@ class NEXUS:
                 (evidence_id,task["project_id"],task_id)).fetchone()
             if not evidence:
                 raise PolicyDenied("verification must reference VERIFIED evidence scoped to this task or project")
+            execution=con.execute("""SELECT actor FROM audit_log WHERE task_id=?
+                AND event_type='STATE_TRANSITION' AND to_state='EXECUTE'
+                ORDER BY created_at DESC LIMIT 1""",(task_id,)).fetchone()
+            if execution and execution["actor"]==verifier.strip():
+                raise PolicyDenied("verification must be performed by a principal different from the recorded executor")
             created=utc_now()
             con.execute("""INSERT INTO verification_records
                 (verification_id,task_id,verifier,passed,evidence_id,result_sha256,notes,created_at)
