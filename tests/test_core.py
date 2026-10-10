@@ -82,6 +82,36 @@ class NexusCoreTests(unittest.TestCase):
         with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"COMPLETE")
         self.n.transition(t["task_id"],"COMPLETE",result="verified output")
         self.assertEqual(self.n.get_task(t["task_id"])["state"],"COMPLETE")
+    def test_task_dependency_blocks_execute_until_dependency_is_complete(self):
+        dependency=self.n.create_task(self.project,"dependency","dependency result","manual verification")
+        task=self.n.create_task(self.project,"dependent task","task result","manual verification")
+        self.n.add_task_dependency(task["task_id"],dependency["task_id"])
+        self.add_verified("dependency evidence")
+        self.n.transition(task["task_id"],"RESEARCH")
+        self.n.transition(task["task_id"],"PLAN")
+        self.n.transition(task["task_id"],"POLICY")
+        with self.assertRaisesRegex(PolicyDenied,"dependencies to be COMPLETE"):
+            self.n.transition(task["task_id"],"EXECUTE")
+        self.n.transition(dependency["task_id"],"RESEARCH")
+        self.n.transition(dependency["task_id"],"PLAN")
+        self.n.transition(dependency["task_id"],"POLICY")
+        self.n.transition(dependency["task_id"],"EXECUTE")
+        self.n.transition(dependency["task_id"],"VERIFY")
+        self.n.transition(dependency["task_id"],"AUDIT")
+        self.n.transition(dependency["task_id"],"COMPLETE",result="dependency verified")
+        self.assertEqual(self.n.transition(task["task_id"],"EXECUTE")["state"],"EXECUTE")
+
+    def test_task_dependency_rejects_cycles_and_cross_project_links(self):
+        first=self.n.create_task(self.project,"first")
+        second=self.n.create_task(self.project,"second")
+        self.n.add_task_dependency(first["task_id"],second["task_id"])
+        with self.assertRaisesRegex(PolicyDenied,"cycle"):
+            self.n.add_task_dependency(second["task_id"],first["task_id"])
+        other=self.n.create_project("other-project")["project_id"]
+        foreign=self.n.create_task(other,"foreign")
+        with self.assertRaisesRegex(PolicyDenied,"same project"):
+            self.n.add_task_dependency(first["task_id"],foreign["task_id"])
+
     def test_router_free_first_and_paid_approval(self):
         paid={"id":"paid","enabled":True,"permission_ok":True,"capability_ok":True,"cost_tier":"paid"}
         free={"id":"free","enabled":True,"permission_ok":True,"capability_ok":True,"cost_tier":"free"}
