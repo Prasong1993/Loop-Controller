@@ -55,3 +55,19 @@ GitHub Actions run #9: https://github.com/Prasong1993/Loop-Controller/actions/ru
 - Workflow conclusion: success.
 - Device-specific Android/iOS/iPadOS tests: NOT RUN.
 - Security and deployment tests: NOT RUN.
+
+
+## 5. ChatGPT application integration acceptance (required; currently NOT RUN)
+
+The target is use through the ChatGPT application on Android, iOS and iPadOS. Native NEXUS apps are out of scope. Physical device tests are not a universal gate; require them only for native/OS-specific features.
+
+| Test ID | Scenario | Expected result | Status |
+|---|---|---|---|
+| NXT-017 | Integration is available in the target ChatGPT account/interface | Configured tool/action is visible and authorized | NOT RUN — not configured |
+| NXT-018 | Create then read a harmless test task through ChatGPT | Task ID/status match controller state | NOT RUN — not configured |
+| NXT-019 | Attempt an unauthorized action | Denied before execution and audit reason recorded | NOT RUN — not configured |
+| NXT-020 | Read audit for the test task | Events show action/outcome/time without leaking secrets | NOT RUN — not configured |
+| NXT-021 | Warning, timeout or ambiguous response | No blind retry; check state before recovery | NOT RUN — not configured |
+| NXT-022 | Use integration from the intended ChatGPT mobile interface | Works within the account's actual supported capabilities | NOT RUN — requires configured integration |
+
+Do not confuse opening the ChatGPT app with proof that NEXUS is connected. CI success is not live integration evidence. Record test date, environment, task/trace IDs, results and redacted evidence when executed.
