@@ -178,5 +178,21 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,403)
         self.assertEqual(response.json()["detail"]["code"],"PROJECT_SCOPE_MISMATCH")
 
+
+    def test_code_proposal_endpoint_returns_proposal_only(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            project=self.client.post("/projects",json={"name":"code-proposal-api"},headers={"Authorization":"Bearer test-secret"}).json()
+            with patch("nexus.api.code_proposal_generator.propose",return_value={
+                "status":"PROPOSAL_ONLY","project_id":project["project_id"],"task_id":None,
+                "trace_id":"code-trace","policy_decision":"NOT_EVALUATED","proposal":{"files":[]}}) as propose:
+                response=self.client.post("/ai/code-proposal",json={"project_id":project["project_id"],
+                    "task":"add a helper","allowed_paths":["nexus/helper.py"],"budget_approved":True},
+                    headers={"Authorization":"Bearer test-secret","x-request-id":"code-trace"})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["status"],"PROPOSAL_ONLY")
+        self.assertEqual(response.json()["policy_decision"],"NOT_EVALUATED")
+        self.assertEqual(propose.call_args.kwargs["allowed_paths"],["nexus/helper.py"])
+        self.assertEqual(propose.call_args.kwargs["trace_id"],"code-trace")
+
 if __name__ == "__main__":
     unittest.main()
