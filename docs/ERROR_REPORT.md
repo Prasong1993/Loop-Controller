@@ -56,3 +56,12 @@ Updated statuses:
 The earlier wording treated native mobile clients and physical device tests as required gaps. That was not aligned with the intended product. NEXUS is intended to be used through the ChatGPT application across Android, iOS and iPadOS, not through separate native NEXUS apps. Therefore native clients and device-matrix tests are OUT OF SCOPE for the current increment.
 
 **New release acceptance blocker:** the NEXUS controller is currently repository code/local FastAPI, not a deployed and connected ChatGPT integration. The following remain NOT RUN until the integration is actually configured: connector discoverability for the user's account, authorized task create/read round-trip, policy-denial behavior, audit retrieval, and warning/error handling. A green CI workflow does not prove ChatGPT integration works.
+
+
+## Scope and acceptance correction — 2026-10-10
+
+Native Android/iOS/iPadOS NEXUS clients and physical-device matrix testing are **OUT OF SCOPE / NOT REQUIRED** for the current ChatGPT-app-first target. These become applicable only if approved native or OS-dependent features are added.
+
+The real release blocker is that the controller/API has not been deployed securely or connected to the target ChatGPT account. Live integration checks (tool availability, authorized task round-trip, policy denial, audit readback and warning/timeout behavior) remain **NOT CONFIGURED / NOT RUN**. CI success does not close this blocker.
+
+The following remain open before production: authentication/authorization, TLS, secrets management, tenant isolation, source-content evidence verification, checkpoint restoration, idempotency/recovery, and supported ChatGPT integration adapter.
