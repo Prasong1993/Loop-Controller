@@ -43,3 +43,12 @@
 - Budget ceilings และผู้อนุมัติ
 - การจัดการ identity/authorization ใน runtime จริง
 - Acceptance thresholds สำหรับแต่ละชนิดงาน
+
+
+## Cross-platform requirement update
+| ID | Requirement | Acceptance criteria | Verification |
+|---|---|---|---|
+| NXR-031 | Cross-platform coverage | Requirements and capability matrix explicitly cover Android, iOS, iPadOS, web/server; platform-specific claims require source evidence | Documentation/evidence review |
+| NXR-032 | Server-authoritative state | Critical task state is not dependent solely on a mobile process or local device storage | Architecture review and recovery test |
+| NXR-033 | Mobile background constraints | No promise of indefinite/unattended execution; OS-specific behavior is documented and tested on target versions | Platform review and device tests |
+| NXR-034 | Client secret safety | Server API keys are not embedded in Android/iOS/iPadOS clients | Static scan and security review |
