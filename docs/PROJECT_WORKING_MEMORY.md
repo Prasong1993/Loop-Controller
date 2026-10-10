@@ -471,3 +471,46 @@ The user requested inspection of available tools/providers, free-first selection
 - Unit-test CI gate: **FAILED; exact cause not yet identified**.
 - Live provider checks: **NOT RUN**.
 - PR merge: **NOT AUTHORIZED**.
+
+
+## 22. Next objective — economical APIs for structured AI/user workflows
+
+**Decision date:** 2026-10-11  
+**Status:** OBJECTIVE RECORDED; API selection/research and implementation NOT YET VERIFIED.
+
+### User's next objective
+The next project focus is to investigate APIs that can be called economically and use them to structure/manage the work process of ChatGPT-based agents and the user's own workflow: intake, task decomposition, planning, evidence gathering, tool/API selection, controlled execution, checkpoints, verification, and recovery.
+
+### Interpretation and boundary
+- “Manage the AI thinking process” means managing the **observable workflow and outputs**: instructions/context supplied, structured plans, declared assumptions and blocked questions, tool-call proposals, deterministic routing/policy, usage metadata, checkpoints, and independently verified results.
+- Do not claim access to, capture of, or control over hidden internal chain-of-thought or private ChatGPT runtime state. Preserve only data and events actually exposed by the API or connected tools and authorized for retention.
+- Keep the OpenAI API runtime distinct from the user's ChatGPT Android app/session. Do not assume repository code can directly control or inspect the ChatGPT app session unless a supported, authorized integration is configured and tested.
+- The goal is cost efficiency without weakening safety, evidence quality, or correctness. Do not select a model/API only because it is cheaper; compare task suitability, actual account access, current official pricing/limits, token usage, latency, reliability, and verification cost.
+- No paid live API calls, service activation, deployment, or other chargeable operation without explicit approval. Source research and offline analysis may proceed without live provider calls.
+
+### Existing project components to inspect before adding anything
+- `docs/OPENAI_CAPABILITY_MATRIX.md`: current project activation status and model-role assumptions.
+- `docs/OPENAI_ADAPTER_CONTRACT.md`: adapter, evidence, policy, usage, and verification boundaries.
+- `nexus/openai_adapter.py`: Responses API tool-routing boundary and usage metadata.
+- `nexus/openai_planner.py`: structured plan proposal, budget gate, and usage recording.
+- `nexus/capabilities.py`: capability allowlist (must be re-read and mapped before design decisions).
+- `nexus/router.py` and `nexus/runlog.py`: deterministic provider routing and run/event history.
+
+These source files show existing implementation claims at source level only. They do not prove live account access, current model entitlement, current price/quota, or production operation.
+
+### Required evidence-first work
+1. Inspect the current branch, repository state, and relevant API/model-routing code before changing implementation.
+2. Research current official OpenAI documentation for supported API capabilities, model selection, token/usage reporting, structured outputs, function calling/tools, prompt/context management, and any supported cost-control mechanisms. Record official URLs, retrieval date, API/model version or change notes where available.
+3. Compare candidate approaches by: task suitability, official current pricing basis, input/output token use, context requirements, tool-round count, latency, rate limits, account entitlement, caching/batching eligibility, and verification overhead. Mark unavailable facts UNKNOWN rather than estimating them as confirmed.
+4. Design a minimal workflow controller that separates model-generated proposals from deterministic policy, tool execution, audit, checkpoints, and independent verification. Prefer reusing existing project components over creating duplicate APIs or registries.
+5. Define acceptance tests and an offline/mock evaluation first. Only run live provider tests after explicit approval and confirmed credentials/budget.
+6. Record exact tested revision, measured usage/cost data when genuinely available, test results, unresolved blockers, and next action. Do not report savings without a measured, comparable baseline.
+
+### Initial status classification
+- User's objective and workflow scope: RECORDED.
+- Existing Responses API adapter and structured planner: VERIFIED — SOURCE FILES PRESENT; runtime behavior not implied.
+- Best low-cost API/model configuration for this user's account: UNKNOWN; official research and account-specific entitlement checks are required.
+- Direct control of hidden ChatGPT reasoning/private Android session: NOT CLAIMED / OUT OF SCOPE unless an authorized supported integration proves otherwise.
+- Live cost comparison and savings: NOT RUN.
+- Paid API activity: NOT AUTHORIZED by this checkpoint.
+- Next action: map existing code and acceptance tests, then collect current official API/model/pricing evidence before proposing or implementing changes.
