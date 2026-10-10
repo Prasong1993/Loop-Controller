@@ -9,3 +9,12 @@
 - เพิ่มทะเบียนแหล่งอ้างอิงโดยตั้งสถานะเป็น UNKNOWN จนกว่าจะตรวจจริง
 - ยืนยันว่า implementation และ runtime tests ยังไม่ได้สร้าง/รันจาก commit นี้
 - ใช้ Loop-Controller เป็น repository เริ่มต้นที่ว่าง; ยังไม่ได้เปลี่ยนชื่อ repository เป็น NEXUS
+
+
+## 2026-10-10 — Initial controller implementation
+- Added deterministic SQLite workflow core, optional FastAPI API, unit-test source and Python CI workflow.
+- Added cross-platform compatibility matrix for Android, iOS, iPadOS and server/web.
+- Added implementation guide and initial error/limitation report.
+- Expanded requirements to explicitly include cross-platform behavior.
+- Inspected official Android, Apple, OpenAI and NASA documentation and updated evidence statuses for narrowly scoped claims.
+- Test execution and production readiness remain unverified/open.
