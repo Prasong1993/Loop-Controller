@@ -302,3 +302,42 @@ Every stage must produce a structured handoff containing:
 5. Update this checkpoint after material progress, including revision/commit, work completed, tests/checks actually run, outcomes, and next step.
 6. At final delivery, read the saved record back and confirm the recorded state matches the actual artifact/revision.
 
+## 17. Core project problem: durable continuity across conversations and work stages
+
+**User clarification (2026-10-11):** The continuity failure is not solved merely by telling the assistant to remember, or by writing more conversational instructions. The project itself must provide a concrete, testable mechanism that restores the correct project context and work position across conversations, then checks that restored information against the actual project state. NASA-style discipline is a work method requested by the user, not a claim that NASA endorses this project.
+
+### Problem statement
+
+Long-running work loses continuity when the next conversation lacks the correct project identity, latest accepted decisions, evidence, exact completed/unfinished work, blockers, and next authorized action. This causes repeated explanations, duplicated research, contradictory decisions, premature restarts, and unverified completion claims. The project must reduce reliance on conversational recall by maintaining an authoritative, project-scoped, versioned state record and a reliable resume procedure.
+
+### Required capabilities to design and verify
+
+1. **Project identity and isolation:** identify the active project/repository/branch and prevent unrelated projects or stale artifacts from contaminating its context.
+2. **Authoritative checkpoint:** persist the roadmap stage and work-unit ID, status, completed deliverables, exact revisions/artifact references, decisions, evidence IDs, checks actually run and results, unresolved items, blockers, and next permitted action.
+3. **Evidence-linked decisions:** connect material requirements and decisions to source/evidence records and their provenance/status. Distinguish VERIFIED, RECOVERED, UNKNOWN, BLOCKED, NOT_RUN, and other project statuses without promoting unknowns into facts.
+4. **Resume protocol:** at new-session intake, load the checkpoint and relevant artifacts, refresh live repository/PR/CI state where available, reconcile conflicts/staleness, and present a concise factual status before continuing.
+5. **Consistency gate:** compare checkpoint claims with observed source-control/artifact/test state. A saved note alone is not proof that code, tests, CI, deployment, or a requested action actually succeeded.
+6. **Stage handoff:** every stage passes forward versioned outputs, evidence IDs, decisions, verification results, unresolved gaps, and acceptance criteria; the next stage starts from the nearest validated package and reopens earlier research only for a specific gap or freshness/contradiction check.
+7. **Controlled updates and recovery:** record checkpoints after meaningful progress, preserve prior history, handle interrupted/ambiguous actions safely, and never blindly repeat non-idempotent effects.
+8. **User-visible truthful status:** on resumption, report the exact known position, verified completed work, incomplete/not-run work, blockers, and next action. If progress percentage cannot be calculated from a defined work-unit denominator, report UNKNOWN rather than inventing a percentage.
+9. **Failure handling:** when resume data is missing, stale, contradictory, or inaccessible, record the specific condition and recover from the best authoritative source available; do not silently guess or claim seamless recovery.
+
+### Minimum acceptance scenarios (requirements, not yet executed tests)
+
+- Start a new conversation after a checkpoint and recover the correct project, branch, stage, completed units, open blockers, and next action without asking the user to repeat recorded facts.
+- Add a similarly named artifact in another project and confirm it is not incorrectly adopted as active-project evidence.
+- Advance a work unit, persist its result, then read back the checkpoint and verify the saved revision/status match the actual artifact.
+- Simulate an interrupted stage and resume without marking unfinished work complete or repeating a non-idempotent action.
+- Change the branch/commit or CI status after checkpoint creation and confirm stale state is refreshed/reconciled before reporting.
+- Remove or contradict a required evidence record and confirm the affected claim becomes UNKNOWN/BLOCKED and dependent work does not proceed as if verified.
+- Confirm every stage handoff retains artifact references, evidence lineage, actual checks/results, unresolved gaps, and next acceptance criteria.
+- Verify the opening status report separates documentation of a requirement from proof of an implemented feature.
+
+### Current disposition
+
+- **Requirement captured:** yes, in this section.
+- **Implemented in runtime:** UNKNOWN — not established by this documentation update.
+- **Acceptance scenarios executed:** NOT_RUN in this session.
+- **Next permitted action:** reconcile the current repository implementation and roadmap against these capabilities; identify the existing checkpoint/resume components and their evidence, map each requirement to code/interface/tests, and record the first concrete implementation gap before changing runtime code.
+- **No PR merge authorized.** PR #3 remains subject to explicit user approval.
+
