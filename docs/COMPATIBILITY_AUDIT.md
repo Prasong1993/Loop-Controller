@@ -160,3 +160,7 @@ GitHub Actions run #121 (commit `a3b898e0437490887046e7629465995f5c959e84`) comp
 
 ## Latest verification read-back
 Run #159 passed compile and 67 tests on Python 3.11, 3.12 and 3.13 at commit `6e5dcfcd46d2781a315bfefdfa6dbcfd34b53bea`: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015447654. It includes task/project-scoped operational record assertions and the code-proposal API. No live provider, public deployment or ChatGPT mobile test was performed.
+
+
+## OpenAPI and operational-record boundary verification
+GitHub Actions run #174 completed successfully on Python 3.11/3.12/3.13. Each job passed the dedicated OpenAPI contract step (4 checks) and the full suite (73 tests). Run: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015687274. The workflow validates OpenAPI YAML syntax/version/required routes and the record store's secret/raw-content rejection. This does not replace live security testing or production auth review.
