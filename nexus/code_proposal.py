@@ -12,8 +12,10 @@ import uuid
 from pathlib import PurePosixPath
 from typing import Any
 from nexus.records import RecordStore
+from nexus.capabilities import CAPABILITY_REGISTRY
 
-SUPPORTED_CODE_MODELS = {"gpt-6-astra", "gpt-6.1-sol"}
+_CODEGEN_SPEC = CAPABILITY_REGISTRY["code_generation"]
+SUPPORTED_CODE_MODELS = set(_CODEGEN_SPEC["supported_models"])
 
 CODE_SCHEMA = {
     "type": "object",
@@ -81,7 +83,7 @@ class OpenAICodeProposalGenerator:
             raise ValueError("project_id and task are required")
         if len(task) > 20000:
             raise ValueError("task must be at most 20000 characters")
-        if self.model not in SUPPORTED_CODE_MODELS:
+        if _CODEGEN_SPEC["status"] != "ENABLED" or self.model not in SUPPORTED_CODE_MODELS:
             raise ValueError(f"code generation is not verified for model {self.model}")
         if not allowed_paths or len(allowed_paths) > 20:
             raise ValueError("allowed_paths must contain 1..20 paths")
