@@ -66,6 +66,10 @@ class NEXUS:
             CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence(project_id);
             CREATE INDEX IF NOT EXISTS idx_audit_task ON audit_log(task_id);
             """)
+            evidence_columns={row["name"] for row in con.execute("PRAGMA table_info(evidence)")}
+            if "task_id" not in evidence_columns:
+                con.execute("ALTER TABLE evidence ADD COLUMN task_id TEXT REFERENCES tasks(task_id)")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence(task_id)")
 
     def _audit(self,con,project_id,task_id,event_type,actor,reason,from_state=None,to_state=None,details=None):
         con.execute("INSERT INTO audit_log VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -97,7 +101,7 @@ class NEXUS:
             if not row: raise ValueError("unknown task_id")
             return dict(row)
 
-    def add_evidence(self,project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="")->dict[str,Any]:
+    def add_evidence(self,project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="",task_id:str|None=None)->dict[str,Any]:
         try: status=EvidenceStatus(status).value
         except ValueError as exc: raise ValueError("invalid evidence status") from exc
         if not claim.strip(): raise ValueError("claim is required")
@@ -107,11 +111,14 @@ class NEXUS:
         with self._connect() as con:
             if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
                 raise ValueError("unknown project_id")
-            con.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?)",(eid,project_id,claim.strip(),status,source_url,inspected,notes))
-            self._audit(con,project_id,None,"EVIDENCE_ADDED","user","Evidence status recorded",
-                        details={"evidence_id":eid,"status":status})
-        return {"evidence_id":eid,"project_id":project_id,"claim":claim.strip(),"status":status,
-                "source_url":source_url,"inspected_at":inspected,"notes":notes}
+            if task_id and not con.execute("SELECT 1 FROM tasks WHERE task_id=? AND project_id=?",(task_id,project_id)).fetchone():
+                raise ValueError("unknown task_id for project")
+            con.execute("INSERT INTO evidence(evidence_id,project_id,claim,status,source_url,inspected_at,notes,task_id) VALUES(?,?,?,?,?,?,?,?)",
+                        (eid,project_id,claim.strip(),status,source_url,inspected,notes,task_id))
+            self._audit(con,project_id,task_id,"EVIDENCE_ADDED","user","Evidence status recorded",
+                        details={"evidence_id":eid,"status":status,"scope":"TASK" if task_id else "PROJECT"})
+        return {"evidence_id":eid,"project_id":project_id,"task_id":task_id,"scope":"TASK" if task_id else "PROJECT",
+                "claim":claim.strip(),"status":status,"source_url":source_url,"inspected_at":inspected,"notes":notes}
 
     def add_verified_evidence(self,project_id:str,claim:str,source_url:str,quoted_text:str,
                               source_text:str,notes:str="",verified_by:str="source-verifier")->dict[str,Any]:
@@ -119,7 +126,7 @@ class NEXUS:
         raise PolicyDenied("Caller-supplied source_text cannot establish VERIFIED evidence; use verify_and_add_evidence")
 
     def verify_and_add_evidence(self,project_id:str,claim:str,source_url:str,quoted_text:str,
-                                notes:str="",verified_by:str="source-verifier")->dict[str,Any]:
+                                notes:str="",verified_by:str="source-verifier",task_id:str|None=None)->dict[str,Any]:
         """Fetch and verify source content inside the trusted core boundary."""
         from nexus.evidence import EvidenceFetchError, verify_source_quote
         import hashlib
@@ -130,6 +137,8 @@ class NEXUS:
         with self._connect() as con:
             if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
                 raise ValueError("unknown project_id")
+            if task_id and not con.execute("SELECT 1 FROM tasks WHERE task_id=? AND project_id=?",(task_id,project_id)).fetchone():
+                raise ValueError("unknown task_id for project")
         try:
             fetched=verify_source_quote(source_url,quoted_text)
         except EvidenceFetchError:
@@ -142,13 +151,16 @@ class NEXUS:
         with self._connect() as con:
             if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
                 raise ValueError("unknown project_id")
-            con.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?)",
+            if task_id and not con.execute("SELECT 1 FROM tasks WHERE task_id=? AND project_id=?",(task_id,project_id)).fetchone():
+                raise ValueError("unknown task_id for project")
+            con.execute("INSERT INTO evidence(evidence_id,project_id,claim,status,source_url,inspected_at,notes,task_id) VALUES(?,?,?,?,?,?,?,?)",
                         (eid,project_id,claim.strip(),EvidenceStatus.VERIFIED.value,source_url,inspected,
-                         json.dumps({"operator_notes":notes,"verification":proof},ensure_ascii=False,sort_keys=True)))
-            self._audit(con,project_id,None,"EVIDENCE_VERIFIED","source-verifier","Exact quote matched trusted fetched source",
-                        details={"evidence_id":eid,"quote_sha256":proof["quote_sha256"],"source_url":source_url})
-        return {"evidence_id":eid,"project_id":project_id,"claim":claim.strip(),"status":"VERIFIED",
-                "source_url":source_url,"inspected_at":inspected,"verification":proof}
+                         json.dumps({"operator_notes":notes,"verification":proof},ensure_ascii=False,sort_keys=True),task_id))
+            self._audit(con,project_id,task_id,"EVIDENCE_VERIFIED","source-verifier","Exact quote matched trusted fetched source",
+                        details={"evidence_id":eid,"quote_sha256":proof["quote_sha256"],"source_url":source_url,
+                                 "scope":"TASK" if task_id else "PROJECT"})
+        return {"evidence_id":eid,"project_id":project_id,"task_id":task_id,"scope":"TASK" if task_id else "PROJECT",
+                "claim":claim.strip(),"status":"VERIFIED","source_url":source_url,"inspected_at":inspected,"verification":proof}
 
     def transition(self,task_id:str,to_state:str,actor:str="system",reason:str="",result:str|None=None,error_code:str|None=None)->dict[str,Any]:
         try: target=State(to_state)
@@ -160,7 +172,7 @@ class NEXUS:
             if target not in ALLOWED_TRANSITIONS[current]:
                 raise InvalidTransition(f"transition {current.value} -> {target.value} is not allowed")
             if target==State.PLAN:
-                n=con.execute("SELECT COUNT(*) FROM evidence WHERE project_id=? AND status='VERIFIED'",(row["project_id"],)).fetchone()[0]
+                n=con.execute("SELECT COUNT(*) FROM evidence WHERE project_id=? AND status='VERIFIED' AND (task_id=? OR task_id IS NULL)",(row["project_id"],task_id)).fetchone()[0]
                 if n<1: raise PolicyDenied("PLAN requires at least one VERIFIED evidence item")
             if target==State.EXECUTE and (not row["expected_outcome"].strip() or not row["verification_method"].strip()):
                 raise PolicyDenied("EXECUTE requires expected_outcome and verification_method")
