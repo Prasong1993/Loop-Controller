@@ -86,7 +86,7 @@ class OpenAIPlanGenerator:
                          "OPENAI_BUDGET_APPROVAL_REQUIRED", {"capabilities": capabilities})
             raise OpenAIPlanError("OPENAI_BUDGET_APPROVAL_REQUIRED",
                                   "OpenAI API use is blocked until paid API budget is explicitly approved.")
-                started = time.monotonic()
+        started = time.monotonic()
         try:
             request_args = {
                 "model": self.model,
