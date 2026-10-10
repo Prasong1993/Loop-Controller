@@ -119,6 +119,10 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(set(seen["tool_names"]),{
             "nexus_get_project_status","nexus_read_audit","nexus_get_task"})
         self.assertEqual(response.json()["trace_id"],"test-trace-01")
+        from nexus.api import record_store
+        scoped=record_store.search(project_id="active-project",record_type="usage",component="rest_api")
+        self.assertGreaterEqual(scoped["total"],1)
+        self.assertTrue(any(row["trace_id"]=="test-trace-01" for row in scoped["records"]))
 
 
     def test_rest_lifecycle_runs_through_verified_completion(self):
@@ -153,6 +157,10 @@ class NexusApiTests(unittest.TestCase):
             audit=self.client.get(f"/projects/{project_id}/audit?task_id={task_id}",headers=headers)
             self.assertEqual(audit.status_code,200)
             self.assertIn("EVIDENCE_VERIFIED",[event["event_type"] for event in audit.json()])
+            records=self.client.get(f"/records/search?project_id={project_id}&task_id={task_id}&component=rest_api",headers=headers)
+            self.assertEqual(records.status_code,200)
+            self.assertGreaterEqual(records.json()["total"],1)
+            self.assertTrue(all(row["project_id"]==project_id for row in records.json()["records"]))
 
 
     def test_code_proposal_requires_server_and_request_budget_gate(self):
