@@ -105,8 +105,17 @@ class NexusCoreTests(unittest.TestCase):
         first=self.n.create_task(self.project,"first")
         second=self.n.create_task(self.project,"second")
         self.n.add_task_dependency(first["task_id"],second["task_id"])
+        with self.assertRaisesRegex(PolicyDenied,"already exists"):
+            self.n.add_task_dependency(first["task_id"],second["task_id"])
         with self.assertRaisesRegex(PolicyDenied,"cycle"):
             self.n.add_task_dependency(second["task_id"],first["task_id"])
+        late=self.n.create_task(self.project,"late dependency","done","manual verification")
+        self.add_verified("late dependency evidence")
+        self.n.transition(late["task_id"],"RESEARCH")
+        self.n.transition(late["task_id"],"PLAN")
+        self.n.transition(late["task_id"],"POLICY")
+        with self.assertRaisesRegex(PolicyDenied,"before the policy gate"):
+            self.n.add_task_dependency(late["task_id"],first["task_id"])
         other=self.n.create_project("other-project")["project_id"]
         foreign=self.n.create_task(other,"foreign")
         with self.assertRaisesRegex(PolicyDenied,"same project"):
