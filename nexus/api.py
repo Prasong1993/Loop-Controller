@@ -311,14 +311,13 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
     request.state.project_id=body.project_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
     if not (body.budget_approved and budget_gate):
-        try:
-            record_store.append(project_id=body.project_id,record_type="decision",
-                trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4()),
-                actor_type="system",component="openai_responses",status="BLOCK",
-                error_code="OPENAI_BUDGET_APPROVAL_REQUIRED",summary="OpenAI tool run blocked by budget gate",
-                payload={"decision":"BLOCK","reason_code":"OPENAI_BUDGET_APPROVAL_REQUIRED"})
-        except Exception:
-            pass
+        # Budget-denial audit is mandatory: if it cannot be persisted, fail visibly
+        # rather than silently losing the reason the OpenAI call was blocked.
+        record_store.append(project_id=body.project_id,record_type="decision",
+            trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4()),
+            actor_type="system",component="openai_responses",status="BLOCK",
+            error_code="OPENAI_BUDGET_APPROVAL_REQUIRED",summary="OpenAI tool run blocked by budget gate",
+            payload={"decision":"BLOCK","reason_code":"OPENAI_BUDGET_APPROVAL_REQUIRED"})
         raise HTTPException(status_code=403,detail={"code":"OPENAI_BUDGET_APPROVAL_REQUIRED",
             "message":"Both request approval and server-side budget approval are required."})
     def status_handler(args):
@@ -344,14 +343,14 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
     def record(**event):
         record_type=event.pop("record_type","usage")
         payload={k:v for k,v in event.items() if k not in {"prompt","arguments","output","api_key"}}
-        try:
-            record_store.append(project_id=body.project_id,record_type=record_type,
-                trace_id=trace_id,operation_id=payload.get("call_id") or payload.get("response_id"),
-                actor_type="system",component="openai_responses",
-                status=str(payload.get("decision",payload.get("outcome","RECORDED"))),
-                error_code=payload.get("error_code"),summary="OpenAI tool orchestration event",payload=payload)
-        except Exception:
-            pass
+        # The worker invokes this callback before it proceeds to the next tool stage.
+        # Propagate persistence errors: do not continue an AI/tool workflow with missing audit.
+        record_store.append(project_id=body.project_id,record_type=record_type,
+            trace_id=trace_id,operation_id=payload.get("call_id") or payload.get("response_id"),
+            actor_type="openai",actor_id=os.getenv("NEXUS_OPENAI_MODEL","gpt-6-luna"),
+            component="openai_responses",
+            status=str(payload.get("decision",payload.get("outcome","RECORDED"))),
+            error_code=payload.get("error_code"),summary="OpenAI tool orchestration event",payload=payload)
     try:
         worker=OpenAIResponsesWorker(model=os.getenv("NEXUS_OPENAI_MODEL","gpt-6-luna"))
         result=worker.run(prompt=body.prompt,tools=_AI_READ_TOOLS,tool_handlers=handlers,
