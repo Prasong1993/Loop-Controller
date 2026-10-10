@@ -154,5 +154,29 @@ class NexusApiTests(unittest.TestCase):
             self.assertEqual(audit.status_code,200)
             self.assertIn("EVIDENCE_VERIFIED",[event["event_type"] for event in audit.json()])
 
+
+    def test_code_proposal_requires_server_and_request_budget_gate(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
+            project=self.client.post("/projects",json={"name":"code-budget"},headers={"Authorization":"Bearer test-secret"}).json()
+            with patch("nexus.api.code_proposal_generator._client",side_effect=AssertionError("provider must not be called")):
+                response=self.client.post("/ai/code-proposal",json={"project_id":project["project_id"],
+                    "task":"add a helper","allowed_paths":["nexus/helper.py"],"budget_approved":True},
+                    headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,403)
+        self.assertEqual(response.json()["detail"]["code"],"OPENAI_BUDGET_APPROVAL_REQUIRED")
+
+    def test_code_proposal_rejects_cross_project_task_before_provider_call(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            project_a=self.client.post("/projects",json={"name":"code-scope-a"},headers={"Authorization":"Bearer test-secret"}).json()
+            project_b=self.client.post("/projects",json={"name":"code-scope-b"},headers={"Authorization":"Bearer test-secret"}).json()
+            task=self.client.post("/tasks",json={"project_id":project_b["project_id"],"title":"foreign",
+                "expected_outcome":"x","verification_method":"y"},headers={"Authorization":"Bearer test-secret"}).json()
+            with patch("nexus.api.code_proposal_generator.propose",side_effect=AssertionError("provider must not be called")):
+                response=self.client.post("/ai/code-proposal",json={"project_id":project_a["project_id"],
+                    "task_id":task["task_id"],"task":"change code","allowed_paths":["nexus/helper.py"],
+                    "budget_approved":True},headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,403)
+        self.assertEqual(response.json()["detail"]["code"],"PROJECT_SCOPE_MISMATCH")
+
 if __name__ == "__main__":
     unittest.main()
