@@ -32,6 +32,23 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(accepted.status_code, 201)
 
 
+    def test_rate_limit_returns_429_after_configured_budget(self):
+        import nexus.api as api_module
+        api_module._rate_limit_state.clear()
+        with patch.dict(os.environ,{"NEXUS_RATE_LIMIT_PER_MINUTE":"1"}):
+            first=self.client.get("/health")
+            second=self.client.get("/health")
+        self.assertEqual(first.status_code,200)
+        self.assertEqual(second.status_code,429)
+
+    def test_mandatory_start_audit_failure_stops_before_project_creation(self):
+        with patch.dict(os.environ,{"NEXUS_API_KEY":"test-secret"}):
+            with patch("nexus.api.record_store.append",side_effect=OSError("audit storage unavailable")):
+                response=self.client.post("/projects",json={"name":"must-not-create"},
+                    headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.json()["code"],"MANDATORY_AUDIT_UNAVAILABLE")
+
     def test_project_level_authorization_denies_cross_tenant_reads_and_writes(self):
         tokens={"alice-token":"alice","bob-token":"bob"}
         auth_env=patch.dict(os.environ,{"NEXUS_API_TOKENS":__import__("json").dumps(tokens),"NEXUS_API_KEY":""})
