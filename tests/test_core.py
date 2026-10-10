@@ -26,6 +26,24 @@ class NexusCoreTests(unittest.TestCase):
     def test_caller_supplied_source_text_cannot_create_verified_evidence(self):
         with self.assertRaises(PolicyDenied):
             self.n.add_verified_evidence(self.project,"claim","https://example.com","claim","fabricated claim")
+    def test_task_specific_evidence_does_not_unlock_other_task(self):
+        task_a=self.n.create_task(self.project,"task A","result","verify")
+        task_b=self.n.create_task(self.project,"task B","result","verify")
+        self.n.transition(task_b["task_id"],"RESEARCH")
+        with patch("nexus.evidence.verify_source_quote",return_value={
+            "source_text":"source","quoted_text":"source","source_chars":6,
+            "method":"exact normalized quote match","source_url":"https://example.com"}):
+            self.n.verify_and_add_evidence(self.project,"A-specific claim","https://example.com","source",task_id=task_a["task_id"])
+        with self.assertRaises(PolicyDenied):
+            self.n.transition(task_b["task_id"],"PLAN")
+    def test_task_specific_evidence_rejects_cross_project_task(self):
+        other=self.n.create_project("other-project")["project_id"]
+        other_task=self.n.create_task(other,"other task")
+        with patch("nexus.evidence.verify_source_quote",return_value={
+            "source_text":"source","quoted_text":"source","source_chars":6,
+            "method":"exact normalized quote match","source_url":"https://example.com"}):
+            with self.assertRaises(ValueError):
+                self.n.verify_and_add_evidence(self.project,"claim","https://example.com","source",task_id=other_task["task_id"])
     def test_invalid_transition_denied(self):
         t=self.n.create_task(self.project,"demo")
         with self.assertRaises(InvalidTransition): self.n.transition(t["task_id"],"COMPLETE")
