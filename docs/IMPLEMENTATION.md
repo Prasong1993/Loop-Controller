@@ -58,3 +58,14 @@ The API contract is documented in [openapi.yaml](../openapi.yaml) and [ChatGPT I
 
 ## Remaining production/integration gaps
 Tenant isolation tied to authenticated identities, migrations, actual source-content evidence verification, restore/idempotency stress tests, rate limiting, redacted logs, backup/restore, secure deployment and a supported ChatGPT connector/adapter remain open. Do not expose the API publicly until reviewed and deployed securely.
+
+
+## Remote MCP adapter
+
+The repository now includes `nexus/mcp_server.py`, an MCP Streamable HTTP adapter for the controller:
+```bash
+uvicorn nexus.mcp_server:app --host 127.0.0.1 --port 8000
+```
+Set `NEXUS_API_KEY` before remote use and terminate TLS at a trusted HTTPS gateway. Never expose the service publicly without security review. The adapter uses a shared bearer token as an interim gate, not production OAuth/identity.
+
+**ChatGPT account gate:** OpenAI's current Help Center documents full MCP apps/write actions for Business, Enterprise and Edu in beta, with developer mode/app creation managed via web/workspace settings. The currently reported Free plan is not documented as supporting this custom MCP app workflow. Therefore the source adapter can be tested in CI, but ChatGPT registration and end-to-end use are blocked until a supported account/interface and authorized setup path are available.
