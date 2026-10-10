@@ -55,3 +55,10 @@ NEXUS targets use through the ChatGPT application on Android, iOS and iPadOS via
 - [Error and limitation report](docs/ERROR_REPORT.md)
 
 Recent code work adds a remote fail-closed bearer-token gate and guarded checkpoint restoration. These do not mean the API has been deployed or connected to ChatGPT; the live integration remains NOT CONFIGURED / NOT RUN.
+
+
+## Controller adapters
+- MCP Streamable HTTP adapter: `nexus/mcp_server.py` (remote use requires secure HTTPS and configured `NEXUS_API_KEY`)
+- Source quote verifier: `nexus/evidence.py` (exact quote match; semantic claim review remains required)
+- OpenAPI contract: `openapi.yaml`
+- Integration contract and plan/account gate: [docs/CHATGPT_INTEGRATION_CONTRACT.md](docs/CHATGPT_INTEGRATION_CONTRACT.md)
