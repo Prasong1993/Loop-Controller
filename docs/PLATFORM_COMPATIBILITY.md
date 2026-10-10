@@ -43,3 +43,9 @@ NEXUS is intended to be accessed through the ChatGPT application on Android, iOS
 - ChatGPT integration acceptance checks: (1) integration is available to the user's account/interface, (2) least-privilege authorization works, (3) create/read a test task round-trip, (4) policy denial blocks an unauthorized action, (5) audit record is retrievable, and (6) errors/warnings do not cause blind retries.
 - Current integration status: NOT RUN / NOT CONFIGURED. The repository's local FastAPI service is not yet deployed or connected to ChatGPT. Do not report ChatGPT-app compatibility as PASS until a real round-trip has evidence.
 - Device/OS tests become required only if a native app, OS API, local file/device access, push notification, or platform-specific background behavior is introduced.
+
+
+## Updated integration availability finding — 2026-10-10
+OpenAI's official Help Center article for developer mode/MCP apps states that full MCP support including write/modify actions is rolling out in beta to ChatGPT Business, Enterprise and Edu, with app setup managed through web/workspace settings. The user's currently reported plan is Free. Therefore custom MCP registration is **BLOCKED on the currently reported plan unless account/workspace eligibility changes or another officially supported route is identified**. The official source reviewed does not prove the custom app is available inside the ChatGPT mobile interface; that remains UNKNOWN until an eligible account is configured and tested.
+
+Source: https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
