@@ -120,5 +120,39 @@ class NexusApiTests(unittest.TestCase):
             "nexus_get_project_status","nexus_read_audit","nexus_get_task"})
         self.assertEqual(response.json()["trace_id"],"test-trace-01")
 
+
+    def test_rest_lifecycle_runs_through_verified_completion(self):
+        headers={"Authorization":"Bearer test-secret","x-request-id":"lifecycle-trace"}
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            project_response=self.client.post("/projects",json={"name":"rest-e2e-project"},headers=headers)
+            self.assertEqual(project_response.status_code,201)
+            project_id=project_response.json()["project_id"]
+            task_response=self.client.post("/tasks",json={"project_id":project_id,"title":"rest-e2e",
+                "expected_outcome":"verified result","verification_method":"assert final state"},
+                headers=headers)
+            self.assertEqual(task_response.status_code,201)
+            task_id=task_response.json()["task_id"]
+            for state in ["RESEARCH"]:
+                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=headers)
+                self.assertEqual(response.status_code,200,response.text)
+            with patch("nexus.evidence.verify_source_quote",return_value={
+                "source_text":"official quote","quoted_text":"official quote","source_chars":14,
+                "method":"exact normalized quote match","source_url":"https://example.com"}):
+                evidence=self.client.post("/evidence/verify",json={"project_id":project_id,
+                    "claim":"source-backed claim","source_url":"https://example.com",
+                    "quoted_text":"official quote"},headers=headers)
+            self.assertEqual(evidence.status_code,200,evidence.text)
+            self.assertEqual(evidence.json()["status"],"VERIFIED")
+            for state in ["PLAN","POLICY","EXECUTE","VERIFY","AUDIT"]:
+                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=headers)
+                self.assertEqual(response.status_code,200,response.text)
+            completed=self.client.post(f"/tasks/{task_id}/transition",json={
+                "to_state":"COMPLETE","result":"verified result"},headers=headers)
+            self.assertEqual(completed.status_code,200,completed.text)
+            self.assertEqual(completed.json()["state"],"COMPLETE")
+            audit=self.client.get(f"/projects/{project_id}/audit?task_id={task_id}",headers=headers)
+            self.assertEqual(audit.status_code,200)
+            self.assertIn("EVIDENCE_VERIFIED",[event["event_type"] for event in audit.json()])
+
 if __name__ == "__main__":
     unittest.main()
