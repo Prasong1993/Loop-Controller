@@ -22,6 +22,7 @@ NEXUS เป็นชั้นควบคุม workflow สำหรับง�
 - [Changelog](CHANGELOG.md)
 - [Architecture and connection map](docs/ARCHITECTURE_MAP.md)
 - [OpenAI capability matrix](docs/OPENAI_CAPABILITY_MATRIX.md)
+- [Operational record schema and search guide](docs/OPERATIONAL_RECORD_SCHEMA.md)
 - [Anchor reference-only boundary](docs/ANCHOR_REFERENCE_BOUNDARIES.md)
 
 ## ข้อจำกัดสำคัญ
