@@ -47,3 +47,12 @@ class ProjectAuthorization:
                 (project_id,principal)).fetchone()
             return bool(row and row[0] in {"OWNER","MEMBER"})
 
+    def grant_member(self,project_id:str,principal:str)->None:
+        if not project_id.strip() or not principal.strip():
+            raise ValueError("project_id and principal are required")
+        from datetime import datetime,timezone
+        with self._connect() as con:
+            con.execute("""INSERT INTO project_members(project_id,principal,role,created_at)
+                VALUES(?,?, 'MEMBER', ?) ON CONFLICT(project_id,principal) DO UPDATE SET role='MEMBER'""",
+                (project_id,principal,datetime.now(timezone.utc).isoformat()))
+
