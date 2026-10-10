@@ -15,8 +15,8 @@ class FakeClient:
     def __init__(self, outputs):
         self.responses = FakeResponses(outputs)
 
-def response(output, text=""):
-    return SimpleNamespace(output=output, output_text=text, id="resp-test")
+def response(output, text="", usage=None):
+    return SimpleNamespace(output=output, output_text=text, id="resp-test", usage=usage)
 
 def call(name, args, call_id="call-1"):
     return SimpleNamespace(type="function_call", name=name, arguments=json.dumps(args), call_id=call_id)
@@ -26,7 +26,7 @@ TOOL = [{"type":"function","name":"read_status","description":"read status",
 
 class OpenAIWorkerTests(unittest.TestCase):
     def test_policy_allow_executes_registered_tool(self):
-        client=FakeClient([response([call("read_status", {})]), response([], "done")])
+        client=FakeClient([response([call("read_status", {})],usage=SimpleNamespace(input_tokens=10,output_tokens=2,total_tokens=12)), response([], "done",usage=SimpleNamespace(input_tokens=5,output_tokens=3,total_tokens=8))])
         seen=[]
         worker=OpenAIResponsesWorker(model="test-model", client=client)
         result=worker.run(prompt="status", tools=TOOL,
@@ -36,6 +36,9 @@ class OpenAIWorkerTests(unittest.TestCase):
         self.assertEqual(result["output_text"],"done")
         self.assertEqual(result["tool_calls"][0]["outcome"],"executed")
         self.assertTrue(any(x["record_type"]=="decision" for x in seen))
+        self.assertEqual(result["usage"]["input_tokens"],15)
+        self.assertEqual(result["usage"]["output_tokens"],5)
+        self.assertTrue(any(x["record_type"]=="usage" and "usage" in x for x in seen))
 
     def test_policy_deny_never_calls_handler(self):
         client=FakeClient([response([call("read_status", {})]), response([], "blocked")])
