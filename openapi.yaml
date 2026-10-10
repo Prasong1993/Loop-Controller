@@ -179,6 +179,28 @@ paths:
         "200": { description: Evidence recorded }
         "403": { description: Policy denied }
         "404": { description: Project not found }
+  /evidence/verify:
+    post:
+      operationId: nexusVerifySourceEvidence
+      summary: Fetch a public HTTPS source and verify an exact quote before recording VERIFIED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, claim, source_url, quoted_text]
+              properties:
+                project_id: { type: string }
+                claim: { type: string, minLength: 1, maxLength: 2000 }
+                source_url: { type: string, format: uri, description: HTTPS public URL only; redirects are not followed }
+                quoted_text: { type: string, minLength: 1, maxLength: 5000 }
+                notes: { type: string }
+      responses:
+        "200": { description: Exact quote matched source content; VERIFIED evidence recorded }
+        "403": { description: Authorization or policy denied }
+        "404": { description: Project not found }
+        "422": { description: Unsafe URL, fetch failure, unsupported content or quote mismatch }
   /projects/{project_id}/audit:
     get:
       operationId: nexusReadProjectAudit
