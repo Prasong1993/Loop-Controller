@@ -51,9 +51,9 @@ Preferred investigation sequence:
 ## Privacy and failure policy
 - Do not store raw prompts, full tool arguments, full model outputs, source page bodies, API keys, authorization headers, passwords, tokens, private keys or environment file contents.
 - Code proposals store only path, operation, SHA-256 and content length in operational records; proposed source content is returned to the caller but is not persisted in the record payload.
-- The record writer rejects common secret-bearing keys recursively. Callers must still redact values before invoking it.
+- The record writer rejects credential-bearing and raw-content keys recursively, including variants such as `OPENAI_API_KEY`, authorization headers, prompts, raw arguments, outputs, source bodies, code content and patches. Callers must still redact values before invoking it.
 - Logging failure must never authorize an otherwise denied action. When the log write fails, the operation should fail closed where auditability is a safety requirement, or return an explicit observability warning for non-critical read operations; current wrappers favor preserving the primary response and this remains a production policy decision.
-- Record retention, encryption at rest, user/tenant access controls, backup/restore and deletion policy are not yet implemented. The shared bearer token is not sufficient for production multi-tenant isolation.
+- Automated tests verify the writer rejects nested credential/raw-content keys while allowing token counts and content hashes. Record retention, encryption at rest, user/tenant access controls, backup/restore and deletion policy are not yet implemented. The shared bearer token is not sufficient for production multi-tenant isolation.
 
 ## Known limitations
 The operational store and workflow core may be configured to separate SQLite paths; no transaction across those files is atomic. Prefer a single configured database path for the prototype. This schema is append-oriented but is not tamper-proof or cryptographically chained. Production deployment needs migrations, retention and audit-integrity controls.
