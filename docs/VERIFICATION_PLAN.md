@@ -71,3 +71,17 @@ The target is use through the ChatGPT application on Android, iOS and iPadOS. Na
 | NXT-022 | Use integration from the intended ChatGPT mobile interface | Works within the account's actual supported capabilities | NOT RUN — requires configured integration |
 
 Do not confuse opening the ChatGPT app with proof that NEXUS is connected. CI success is not live integration evidence. Record test date, environment, task/trace IDs, results and redacted evidence when executed.
+
+
+## 6. New code-level acceptance cases
+
+| Test ID | Scenario | Expected result | Evidence |
+|---|---|---|---|
+| NXT-023 | Restore checkpoint while task is BLOCKED | Restore only an allowed state; add CHECKPOINT_RESTORED audit event | `tests/test_core.py` |
+| NXT-024 | Restore attempted outside BLOCKED/RECOVER | Policy denial | `tests/test_core.py` |
+| NXT-025 | Restore checkpoint captured in EXECUTE | Policy denial; never automatically replay side-effecting execution | `tests/test_core.py` |
+| NXT-026 | Remote API request with no server token configured | Fail closed with HTTP 503 | `tests/test_api.py` |
+| NXT-027 | Configured API token missing/valid | Missing token gets 401; valid token is accepted | `tests/test_api.py` |
+| NXT-028 | Unknown task identifier | HTTP 404 | `tests/test_api.py` |
+
+These are test definitions in source. Mark PASS only after the latest GitHub Actions run reports success.
