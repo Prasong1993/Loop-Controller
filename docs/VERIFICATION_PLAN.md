@@ -119,3 +119,26 @@ Coverage in this run includes deterministic workflow gates, task-scoped evidence
 | NXT-038 | Structured plan remains PROPOSAL_ONLY; unsupported capability rejected; no-tools request omits tools field | `tests/test_openai_planner.py` | PASS in CI #121 |
 | NXT-039 | OpenAI read tool cross-project request is blocked before handler | `tests/test_api.py`, `tests/test_openai_adapter.py` | PASS in CI #121 |
 | NXT-040 | REST lifecycle completes only after evidence, audit and result; audit readback works | `tests/test_api.py` | PASS in CI #121 |
+
+
+## Latest code-generation verification — 2026-10-10
+**GitHub Actions run #150:** https://github.com/Prasong1993/Loop-Controller/actions/runs/38015297401  
+Commit: `5ed8246436e82169743d94ea8b00c88d9418ef55`.
+
+| Runtime | Compile | Tests | Result |
+|---|---|---|---|
+| Python 3.11 | PASS | 67 tests, 0 failures | PASS |
+| Python 3.12 | PASS | 67 tests, 0 failures | PASS |
+| Python 3.13 | PASS | 67 tests, 0 failures | PASS |
+
+The suite now includes a code-proposal generator using Responses API + strict structured output, explicit allowed-path checks, code-model allowlisting from the central capability registry, double budget gating, redacted hash/metadata-only operational records, and REST endpoint scope checks. This run predates later documentation-only commits; the next CI run should verify the final docs commit.
+
+| Test ID | Scenario | Evidence | Latest disposition |
+|---|---|---|---|
+| NXT-041 | Code proposal is blocked without both budget approvals | `tests/test_code_proposal.py`, `tests/test_api.py` | PASS in CI #150 |
+| NXT-042 | Generated file paths must match explicit allowlist; unsafe paths blocked and recorded | `tests/test_code_proposal.py` | PASS in CI #150 |
+| NXT-043 | Code proposal output remains PROPOSAL_ONLY and raw code is not persisted in operational records | `tests/test_code_proposal.py` | PASS in CI #150 |
+| NXT-044 | Cross-project task ID is denied before code proposal provider call | `tests/test_api.py` | PASS in CI #150 |
+| NXT-045 | Unreviewed code model override is rejected before provider call | `tests/test_code_proposal.py` | PASS in CI #150 |
+
+**Remaining NOT RUN/BLOCKED:** live OpenAI provider request, workspace write/apply-patch adapter, code execution sandbox, real repository integration from the NEXUS service, remote deployment, production identity/tenant isolation and ChatGPT Android integration.
