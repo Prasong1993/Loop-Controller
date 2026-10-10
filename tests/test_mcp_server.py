@@ -20,7 +20,8 @@ class NexusMcpGateTests(unittest.TestCase):
     def test_mcp_accepts_matching_bearer_at_gate(self):
         client=TestClient(app)
         with patch.dict(os.environ,{"NEXUS_API_KEY":"test-secret"}):
-            response=client.post("/mcp",json={},headers={"Authorization":"Bearer test-secret"})
+            with TestClient(app) as live_client:
+                response=live_client.post("/mcp",json={},headers={"Authorization":"Bearer test-secret"})
         # Authentication succeeds; the MCP protocol may reject an empty JSON-RPC payload.
         self.assertNotEqual(response.status_code,401)
         self.assertNotEqual(response.status_code,503)
