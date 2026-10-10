@@ -61,5 +61,30 @@ class NexusApiTests(unittest.TestCase):
                                        headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code, 404)
 
+
+    def test_ai_plan_is_blocked_without_explicit_paid_budget_approval(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
+            response=self.client.post("/ai/plan",json={"project_id":"p-test","task":"draft a plan","budget_approved":True},
+                                      headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,403)
+        self.assertEqual(response.json()["detail"]["code"],"OPENAI_BUDGET_APPROVAL_REQUIRED")
+
+    def test_ai_run_is_blocked_without_explicit_paid_budget_approval(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
+            response=self.client.post("/ai/run",json={"project_id":"p-test","prompt":"read status","budget_approved":True},
+                                      headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,403)
+
+    def test_record_search_endpoint_returns_scoped_page(self):
+        from nexus.api import record_store
+        record_store.append(project_id="search-test",record_type="usage",payload={"operation":"unit-test"},
+                            summary="search endpoint test")
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            response=self.client.get("/records/search?project_id=search-test&record_type=usage",
+                                     headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,200)
+        self.assertGreaterEqual(response.json()["total"],1)
+        self.assertEqual(response.json()["project_id"],"search-test")
+
 if __name__ == "__main__":
     unittest.main()
