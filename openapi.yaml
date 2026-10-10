@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NEXUS Controller API
-  version: 0.2.0
+  version: 0.4.0
   description: >
     Deterministic project workflow controller. Configure NEXUS_API_KEY on the
     server and send it as a Bearer token. This REST contract alone does not
@@ -160,8 +160,7 @@ paths:
       summary: Record evidence status
       description: >
         A URL alone is not proof that a claim was independently verified.
-        This endpoint records the caller-provided status; source-content
-        verification is a known implementation gap.
+        VERIFIED is prohibited here; use /evidence/verify for trusted fetch-and-quote verification.
       requestBody:
         required: true
         content:
@@ -172,7 +171,7 @@ paths:
               properties:
                 project_id: { type: string }
                 claim: { type: string, minLength: 1, maxLength: 2000 }
-                status: { type: string, enum: [VERIFIED, RECOVERED, UNKNOWN, BLOCKED] }
+                status: { type: string, enum: [RECOVERED, UNKNOWN, BLOCKED] }
                 source_url: { type: [string, "null"], format: uri }
                 notes: { type: string }
       responses:
@@ -233,6 +232,107 @@ paths:
                 budget_approved: { type: boolean, default: false }
       responses:
         "200": { description: Route decision }
+
+  /records/search:
+    get:
+      operationId: nexusSearchOperationalRecords
+      summary: Search redacted usage, error, evidence, decision, checkpoint and verification records
+      parameters:
+        - in: query
+          name: project_id
+          required: true
+          schema: { type: string, minLength: 1 }
+        - in: query
+          name: record_type
+          schema: { type: string, enum: [usage, error, evidence, decision, checkpoint, verification] }
+        - in: query
+          name: task_id
+          schema: { type: string }
+        - in: query
+          name: trace_id
+          schema: { type: string }
+        - in: query
+          name: operation_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: error_code
+          schema: { type: string }
+        - in: query
+          name: component
+          schema: { type: string }
+        - in: query
+          name: query
+          schema: { type: string }
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+        - in: query
+          name: until
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200": { description: Project-scoped paginated operational records }
+        "422": { description: Invalid filters or pagination }
+  /ai/plan:
+    post:
+      operationId: nexusProposeStructuredPlan
+      summary: Generate a structured plan proposal through OpenAI Responses API
+      description: >
+        Requires request budget_approved=true AND server environment
+        NEXUS_OPENAI_BUDGET_APPROVED=true. A proposal never authorizes execution.
+        Only verified supported optional capabilities may be enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, task]
+              properties:
+                project_id: { type: string, minLength: 1, maxLength: 200 }
+                task: { type: string, minLength: 1, maxLength: 20000 }
+                constraints: { type: array, maxItems: 100, items: { type: string } }
+                capabilities: { type: array, maxItems: 2, items: { type: string, enum: [web_search] } }
+                budget_approved: { type: boolean, default: false }
+      responses:
+        "200": { description: Structured proposal only; deterministic policy has not approved execution }
+        "403": { description: Budget approval gate blocked the provider call }
+        "422": { description: Invalid request or unsupported capability }
+        "502": { description: OpenAI provider request failed }
+        "503": { description: OpenAI API key or SDK is unavailable }
+  /ai/run:
+    post:
+      operationId: nexusRunOpenAIReadTools
+      summary: Run OpenAI Responses API with NEXUS-gated read-only project tools
+      description: >
+        Only project status, task detail and audit read tools are registered.
+        Each tool request is checked by deterministic NEXUS policy and limited
+        to the project_id in this request. Requires request budget_approved=true
+        AND server environment NEXUS_OPENAI_BUDGET_APPROVED=true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, prompt]
+              properties:
+                project_id: { type: string, minLength: 1, maxLength: 200 }
+                prompt: { type: string, minLength: 1, maxLength: 20000 }
+                budget_approved: { type: boolean, default: false }
+      responses:
+        "200": { description: Model response and policy decisions for read-only tool calls }
+        "403": { description: Budget gate or deterministic policy denial }
+        "422": { description: Invalid request }
+        "502": { description: OpenAI provider or tool orchestration failed }
 components:
   securitySchemes:
     BearerAuth:
