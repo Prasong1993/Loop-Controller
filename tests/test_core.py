@@ -1,4 +1,5 @@
 import tempfile
+import sqlite3
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +15,17 @@ class NexusCoreTests(unittest.TestCase):
             "source_text":claim,"quoted_text":claim,"source_chars":len(claim),
             "method":"exact normalized quote match","source_url":"https://example.com"}):
             return self.n.verify_and_add_evidence(self.project,claim,"https://example.com",claim)
+    def test_legacy_evidence_table_migrates_task_scope_column(self):
+        legacy_path=str(Path(self.tmp.name)/"legacy.db")
+        with sqlite3.connect(legacy_path) as con:
+            con.execute("CREATE TABLE projects(project_id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL)")
+            con.execute("CREATE TABLE tasks(task_id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(project_id),title TEXT NOT NULL,state TEXT NOT NULL,expected_outcome TEXT NOT NULL DEFAULT '',verification_method TEXT NOT NULL DEFAULT '',result TEXT NOT NULL DEFAULT '',error_code TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)")
+            con.execute("CREATE TABLE evidence(evidence_id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(project_id),claim TEXT NOT NULL,status TEXT NOT NULL,source_url TEXT,inspected_at TEXT,notes TEXT NOT NULL DEFAULT '')")
+        migrated=NEXUS(legacy_path)
+        with sqlite3.connect(legacy_path) as con:
+            columns={row[1] for row in con.execute("PRAGMA table_info(evidence)")}
+        self.assertIn("task_id",columns)
+        self.assertIsNotNone(migrated)
     def test_task_starts_at_intake(self):
         self.assertEqual(self.n.create_task(self.project,"demo")["state"],"INTAKE")
     def test_unknown_evidence_cannot_satisfy_research_gate(self):
