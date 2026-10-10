@@ -125,3 +125,26 @@ Parallel execution is the default when tasks are independent and the connected t
 - [ ] Partial failures and NOT_RUN/BLOCKED work are visible in the final report.
 - [ ] A benchmark or execution log can compare elapsed time and correctness against an unnecessarily sequential baseline when useful.
 
+## 12. Tool-first intake and work orchestration
+
+Tool selection and work decomposition must begin at task intake, not after a long, purely sequential analysis. As soon as a user message arrives, determine the task intent, applicable project, risk/approval boundaries, and the kinds of evidence or outputs needed; then select the appropriate connected tools and skills to structure the work.
+
+- Start with a lightweight intake record: task/run ID when available, objective, deliverables, constraints, acceptance criteria, required evidence, and any approval gates.
+- Retrieve the current project Working Memory and relevant source-of-truth artifacts early when the request belongs to an existing project. Do not mix unrelated or stale project context into the active task.
+- Inspect the available tool/skill inventory when capability choice matters. Select tools by their actual capabilities and access, not by habit; include tools for retrieval, code/repository work, testing, storage, and independent verification where relevant.
+- Build a dependency-aware work graph before executing substantial work. Mark each unit as parallelizable, dependent, approval-gated, or blocked; assign expected inputs/outputs and verification criteria.
+- Launch independent initial discovery concurrently where supported—for example, official-documentation research, repository/status inspection, test discovery, and backup/storage checks. Merge their results into one evidence register before making decisions that depend on them.
+- Use tools as external work-management and evidence mechanisms: task decomposition, retrieval, durable notes, task IDs, checkpoints, test execution, audit records, and result reconciliation. Do not claim that tools expose or control hidden internal model reasoning; preserve only the instructions, outputs, actions, and events actually available to the application.
+- Keep the intake/orchestration process proportional: use a lightweight path for simple questions, and a structured multi-tool plan for project work, multi-step tasks, risky changes, or requests involving several systems.
+- Do not wait until analysis is entirely finished to discover that a necessary tool, source, or verification path was available. Identify tool needs early, while still allowing the plan to change when evidence reveals new dependencies.
+- Before final delivery, reconcile the work graph against actual tool results and mark each work unit VERIFIED, COMPLETED, FAILED, BLOCKED, NOT_RUN, UNKNOWN, or RECOVERED as supported by evidence.
+
+### Tool-first intake acceptance criteria
+
+- [ ] Tool/skill selection starts at intake for project and multi-step work.
+- [ ] Current project memory and source-of-truth files are retrieved before changes.
+- [ ] The tool inventory is checked when relevant rather than defaulting to a familiar tool.
+- [ ] Independent discovery tasks are launched concurrently when supported.
+- [ ] A dependency-aware work graph identifies parallel tasks, serial dependencies, approval gates, and verification steps.
+- [ ] Final status is reconciled with actual tool evidence; no planned or unlaunched work is reported as executed.
+
