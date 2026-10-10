@@ -1,0 +1,219 @@
+openapi: 3.1.0
+info:
+  title: NEXUS Controller API
+  version: 0.2.0
+  description: >
+    Deterministic project workflow controller. Configure NEXUS_API_KEY on the
+    server and send it as a Bearer token. This REST contract alone does not
+    create a ChatGPT connector; the target account/interface must support and
+    configure a compatible integration.
+servers:
+  - url: https://YOUR-SECURE-NEXUS-HOST
+    description: Replace with the deployed HTTPS endpoint after security review.
+security:
+  - BearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: nexusHealth
+      security: []
+      summary: Check service liveness
+      responses:
+        "200":
+          description: Service is responding
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  service: { type: string }
+                  version: { type: string }
+  /projects:
+    post:
+      operationId: nexusCreateProject
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "201": { description: Project created }
+        "401": { description: Missing bearer token }
+        "403": { description: Invalid bearer token or policy denied }
+        "503": { description: Remote API disabled because no token is configured }
+  /projects/{project_id}/status:
+    get:
+      operationId: nexusGetProjectStatus
+      summary: Read project state and task counts
+      parameters:
+        - in: path
+          name: project_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Project status }
+        "404": { description: Project not found }
+  /tasks:
+    post:
+      operationId: nexusCreateTask
+      summary: Create a task in a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, title]
+              properties:
+                project_id: { type: string }
+                title: { type: string, minLength: 1, maxLength: 500 }
+                expected_outcome: { type: string }
+                verification_method: { type: string }
+      responses:
+        "201": { description: Task created }
+        "404": { description: Project not found }
+  /tasks/{task_id}:
+    get:
+      operationId: nexusGetTask
+      summary: Read task status
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Task status }
+        "404": { description: Task not found }
+  /tasks/{task_id}/transition:
+    post:
+      operationId: nexusTransitionTask
+      summary: Request a policy-gated state transition
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_state]
+              properties:
+                to_state: { type: string, enum: [INTAKE, RESEARCH, PLAN, POLICY, EXECUTE, VERIFY, AUDIT, COMPLETE, RECOVER, BLOCKED] }
+                actor: { type: string, default: api }
+                reason: { type: string }
+                result: { type: [string, "null"] }
+                error_code: { type: [string, "null"] }
+      responses:
+        "200": { description: Transition accepted }
+        "403": { description: Policy denied }
+        "404": { description: Task not found }
+        "409": { description: Invalid transition }
+  /tasks/{task_id}/checkpoint:
+    post:
+      operationId: nexusCreateCheckpoint
+      summary: Create a task checkpoint
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Checkpoint created }
+        "404": { description: Task not found }
+  /tasks/{task_id}/restore:
+    post:
+      operationId: nexusRestoreCheckpoint
+      summary: Restore safe checkpoint metadata after BLOCKED or RECOVER
+      description: Execution-state checkpoints are not automatically replayed.
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checkpoint_id]
+              properties:
+                checkpoint_id: { type: string }
+                actor: { type: string, default: api }
+                reason: { type: string }
+      responses:
+        "200": { description: Checkpoint restored }
+        "403": { description: Restore policy denied }
+        "404": { description: Task or checkpoint not found }
+  /evidence:
+    post:
+      operationId: nexusAddEvidenceRecord
+      summary: Record evidence status
+      description: >
+        A URL alone is not proof that a claim was independently verified.
+        This endpoint records the caller-provided status; source-content
+        verification is a known implementation gap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, claim, status]
+              properties:
+                project_id: { type: string }
+                claim: { type: string, minLength: 1, maxLength: 2000 }
+                status: { type: string, enum: [VERIFIED, RECOVERED, UNKNOWN, BLOCKED] }
+                source_url: { type: [string, "null"], format: uri }
+                notes: { type: string }
+      responses:
+        "200": { description: Evidence recorded }
+        "403": { description: Policy denied }
+        "404": { description: Project not found }
+  /projects/{project_id}/audit:
+    get:
+      operationId: nexusReadProjectAudit
+      summary: Read project audit events
+      parameters:
+        - in: path
+          name: project_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: task_id
+          schema: { type: string }
+      responses:
+        "200": { description: Audit events }
+        "404": { description: Project not found }
+  /policy/route:
+    post:
+      operationId: nexusSelectToolRoute
+      summary: Select an eligible tool candidate without executing it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidates]
+              properties:
+                candidates: { type: array, items: { type: object } }
+                allow_paid: { type: boolean, default: false }
+                budget_approved: { type: boolean, default: false }
+      responses:
+        "200": { description: Route decision }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque API token
