@@ -1,0 +1,172 @@
+"""Deterministic NEXUS workflow core. No LLM is used for policy decisions."""
+from __future__ import annotations
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Any
+import json
+import sqlite3
+import uuid
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+class State(str, Enum):
+    INTAKE="INTAKE"; RESEARCH="RESEARCH"; PLAN="PLAN"; POLICY="POLICY"
+    EXECUTE="EXECUTE"; VERIFY="VERIFY"; AUDIT="AUDIT"; COMPLETE="COMPLETE"
+    RECOVER="RECOVER"; BLOCKED="BLOCKED"
+
+class EvidenceStatus(str, Enum):
+    VERIFIED="VERIFIED"; RECOVERED="RECOVERED"; UNKNOWN="UNKNOWN"; BLOCKED="BLOCKED"
+
+ALLOWED_TRANSITIONS = {
+    State.INTAKE:{State.RESEARCH,State.BLOCKED},
+    State.RESEARCH:{State.PLAN,State.BLOCKED,State.RECOVER},
+    State.PLAN:{State.POLICY,State.RECOVER,State.BLOCKED},
+    State.POLICY:{State.EXECUTE,State.RECOVER,State.BLOCKED},
+    State.EXECUTE:{State.VERIFY,State.RECOVER,State.BLOCKED},
+    State.VERIFY:{State.AUDIT,State.RECOVER,State.BLOCKED},
+    State.AUDIT:{State.COMPLETE,State.RECOVER,State.BLOCKED},
+    State.RECOVER:{State.RESEARCH,State.PLAN,State.POLICY,State.EXECUTE,State.VERIFY,State.BLOCKED},
+    State.BLOCKED:{State.RECOVER}, State.COMPLETE:set()
+}
+
+class PolicyDenied(ValueError): pass
+class InvalidTransition(ValueError): pass
+
+class NEXUS:
+    """SQLite-backed deterministic workflow controller with audit events."""
+    def __init__(self, database: str = "data/nexus.db"):
+        self.database=database
+        Path(database).parent.mkdir(parents=True,exist_ok=True)
+        self._init_db()
+
+    def _connect(self):
+        con=sqlite3.connect(self.database)
+        con.row_factory=sqlite3.Row
+        con.execute("PRAGMA foreign_keys=ON")
+        return con
+
+    def _init_db(self):
+        with self._connect() as con:
+            con.executescript("""
+            CREATE TABLE IF NOT EXISTS projects(project_id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS tasks(task_id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(project_id),
+              title TEXT NOT NULL,state TEXT NOT NULL,expected_outcome TEXT NOT NULL DEFAULT '',
+              verification_method TEXT NOT NULL DEFAULT '',result TEXT NOT NULL DEFAULT '',error_code TEXT NOT NULL DEFAULT '',
+              created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS evidence(evidence_id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(project_id),
+              claim TEXT NOT NULL,status TEXT NOT NULL,source_url TEXT,inspected_at TEXT,notes TEXT NOT NULL DEFAULT '');
+            CREATE TABLE IF NOT EXISTS audit_log(event_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,task_id TEXT,
+              event_type TEXT NOT NULL,from_state TEXT,to_state TEXT,actor TEXT NOT NULL,reason TEXT NOT NULL,
+              created_at TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{}');
+            CREATE TABLE IF NOT EXISTS checkpoints(checkpoint_id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(task_id),
+              state TEXT NOT NULL,snapshot_json TEXT NOT NULL,created_at TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+            CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence(project_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_task ON audit_log(task_id);
+            """)
+
+    def _audit(self,con,project_id,task_id,event_type,actor,reason,from_state=None,to_state=None,details=None):
+        con.execute("INSERT INTO audit_log VALUES(?,?,?,?,?,?,?,?,?,?)",
+          (str(uuid.uuid4()),project_id,task_id,event_type,from_state,to_state,actor,reason,utc_now(),
+           json.dumps(details or {},ensure_ascii=False,sort_keys=True)))
+
+    def create_project(self,name:str)->dict[str,Any]:
+        if not name.strip(): raise ValueError("project name is required")
+        pid=str(uuid.uuid4())
+        with self._connect() as con:
+            con.execute("INSERT INTO projects VALUES(?,?,?)",(pid,name.strip(),utc_now()))
+            self._audit(con,pid,None,"PROJECT_CREATED","user","Project initialized")
+        return {"project_id":pid,"name":name.strip()}
+
+    def create_task(self,project_id:str,title:str,expected_outcome:str="",verification_method:str="")->dict[str,Any]:
+        if not title.strip(): raise ValueError("task title is required")
+        now=utc_now(); tid=str(uuid.uuid4())
+        with self._connect() as con:
+            if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
+                raise ValueError("unknown project_id")
+            con.execute("INSERT INTO tasks(task_id,project_id,title,state,expected_outcome,verification_method,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+              (tid,project_id,title.strip(),State.INTAKE.value,expected_outcome,verification_method,now,now))
+            self._audit(con,project_id,tid,"TASK_CREATED","user","Task initialized",None,State.INTAKE.value)
+        return self.get_task(tid)
+
+    def get_task(self,task_id:str)->dict[str,Any]:
+        with self._connect() as con:
+            row=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not row: raise ValueError("unknown task_id")
+            return dict(row)
+
+    def add_evidence(self,project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="")->dict[str,Any]:
+        try: status=EvidenceStatus(status).value
+        except ValueError as exc: raise ValueError("invalid evidence status") from exc
+        if not claim.strip(): raise ValueError("claim is required")
+        if status=="VERIFIED" and not source_url: raise PolicyDenied("VERIFIED evidence requires source_url")
+        eid=str(uuid.uuid4()); inspected=utc_now() if status=="VERIFIED" else None
+        with self._connect() as con:
+            if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
+                raise ValueError("unknown project_id")
+            con.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?)",(eid,project_id,claim.strip(),status,source_url,inspected,notes))
+            self._audit(con,project_id,None,"EVIDENCE_ADDED","user","Evidence status recorded",
+                        details={"evidence_id":eid,"status":status})
+        return {"evidence_id":eid,"project_id":project_id,"claim":claim.strip(),"status":status,
+                "source_url":source_url,"inspected_at":inspected,"notes":notes}
+
+    def transition(self,task_id:str,to_state:str,actor:str="system",reason:str="",result:str|None=None,error_code:str|None=None)->dict[str,Any]:
+        try: target=State(to_state)
+        except ValueError as exc: raise InvalidTransition("unknown target state") from exc
+        with self._connect() as con:
+            row=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not row: raise ValueError("unknown task_id")
+            current=State(row["state"])
+            if target not in ALLOWED_TRANSITIONS[current]:
+                raise InvalidTransition(f"transition {current.value} -> {target.value} is not allowed")
+            if target==State.PLAN:
+                n=con.execute("SELECT COUNT(*) FROM evidence WHERE project_id=? AND status='VERIFIED'",(row["project_id"],)).fetchone()[0]
+                if n<1: raise PolicyDenied("PLAN requires at least one VERIFIED evidence item")
+            if target==State.EXECUTE and (not row["expected_outcome"].strip() or not row["verification_method"].strip()):
+                raise PolicyDenied("EXECUTE requires expected_outcome and verification_method")
+            if target==State.COMPLETE and (current!=State.AUDIT or not (result or row["result"]).strip()):
+                raise PolicyDenied("COMPLETE requires AUDIT state and a recorded result")
+            now=utc_now()
+            con.execute("UPDATE tasks SET state=?,updated_at=?,result=COALESCE(?,result),error_code=COALESCE(?,error_code) WHERE task_id=?",
+              (target.value,now,result,error_code,task_id))
+            self._audit(con,row["project_id"],task_id,"STATE_TRANSITION",actor,reason or "No reason supplied",
+                        current.value,target.value,{"error_code":error_code} if error_code else {})
+            return dict(con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone())
+
+    def checkpoint(self,task_id:str)->dict[str,Any]:
+        task=self.get_task(task_id); cid=str(uuid.uuid4())
+        with self._connect() as con:
+            con.execute("INSERT INTO checkpoints VALUES(?,?,?,?,?)",(cid,task_id,task["state"],json.dumps(task,sort_keys=True),utc_now()))
+            self._audit(con,task["project_id"],task_id,"CHECKPOINT_CREATED","system","Explicit checkpoint",
+                        task["state"],task["state"],{"checkpoint_id":cid})
+        return {"checkpoint_id":cid,"task_id":task_id,"state":task["state"]}
+
+    def audit(self,project_id:str,task_id:str|None=None)->list[dict[str,Any]]:
+        with self._connect() as con:
+            if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
+                raise ValueError("unknown project_id")
+            if task_id:
+                rows=con.execute("SELECT * FROM audit_log WHERE project_id=? AND task_id=? ORDER BY created_at",(project_id,task_id))
+            else: rows=con.execute("SELECT * FROM audit_log WHERE project_id=? ORDER BY created_at",(project_id,))
+            return [dict(r) for r in rows]
+
+    def policy_route(self,candidates:list[dict[str,Any]],allow_paid:bool=False,budget_approved:bool=False)->dict[str,Any]:
+        usable=[c for c in candidates if c.get("enabled") and c.get("permission_ok") and c.get("capability_ok") and not c.get("warning")]
+        free=[c for c in usable if c.get("cost_tier","free")=="free"]
+        if free: return {"decision":"ALLOW","selected":free[0].get("id"),"reason":"first eligible free candidate"}
+        paid=[c for c in usable if c.get("cost_tier")=="paid"]
+        if paid and allow_paid and budget_approved:
+            return {"decision":"ALLOW","selected":paid[0].get("id"),"reason":"paid tool explicitly approved"}
+        return {"decision":"BLOCK","selected":None,"reason":"no eligible free candidate; paid tool missing explicit approval or unavailable"}
+
+    def status(self,project_id:str)->dict[str,Any]:
+        with self._connect() as con:
+            p=con.execute("SELECT * FROM projects WHERE project_id=?",(project_id,)).fetchone()
+            if not p: raise ValueError("unknown project_id")
+            tasks=[dict(r) for r in con.execute("SELECT * FROM tasks WHERE project_id=? ORDER BY created_at",(project_id,))]
+            evidence=[dict(r) for r in con.execute("SELECT * FROM evidence WHERE project_id=? ORDER BY inspected_at",(project_id,))]
+            return {"project":dict(p),"task_counts":{s.value:sum(t["state"]==s.value for t in tasks) for s in State},
+              "tasks":tasks,"evidence_count":len(evidence),
+              "evidence_status_counts":{s.value:sum(e["status"]==s.value for e in evidence) for s in EvidenceStatus}}
