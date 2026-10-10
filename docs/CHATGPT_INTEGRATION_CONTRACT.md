@@ -65,3 +65,23 @@ For each run, record:
 - No ChatGPT tool/connector is registered against this API.
 - End-to-end ChatGPT acceptance has not run.
 - Bearer-token auth is a prototype gate, not a substitute for a reviewed production identity/OAuth model.
+
+
+## Implemented adapter
+
+A remote MCP adapter now exists at `nexus/mcp_server.py` using the Python MCP SDK and Streamable HTTP transport. It exposes bounded controller tools for project/task management, guarded transitions, checkpoint recovery, evidence quote verification, audit readback and route selection. It does not expose arbitrary shell, SQL or arbitrary URL fetch.
+
+Run locally with:
+```bash
+uvicorn nexus.mcp_server:app --host 127.0.0.1 --port 8000
+```
+For a remote integration, use a secured HTTPS deployment and set `NEXUS_API_KEY`. Remote calls fail closed when the token is not configured. The shared bearer-token gate is prototype security only; use a reviewed OAuth/identity setup for production.
+
+## OpenAI account capability gate (official documentation checked 2026-10-10)
+
+OpenAI's current Help Center article says full MCP support including write/modify actions is rolling out in beta to ChatGPT Business, Enterprise and Edu, with developer mode/custom MCP apps managed through the web/workspace settings. Availability is account/workspace/interface-dependent. The user's currently reported plan is Free, so **custom MCP app availability on that account is BLOCKED/NOT AVAILABLE based on current documented plan requirements** unless the account/plan changes or another officially supported integration path is confirmed. Do not promise this connector can be added from the current Free plan.
+
+Official references:
+- Developer mode and MCP apps: https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+- Build with Apps SDK: https://help.openai.com/en/articles/12515353-build-with-the-apps-sdk
+- Connected apps availability: https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt
