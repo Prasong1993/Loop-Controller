@@ -193,6 +193,24 @@ class NEXUS:
                         task["state"],task["state"],{"checkpoint_id":cid})
         return {"checkpoint_id":cid,"task_id":task_id,"state":task["state"]}
 
+    def record_router_checkpoint(self,task_id:str,snapshot:dict[str,Any],actor:str="tool-router")->dict[str,Any]:
+        """Persist a router stage checkpoint and audit event in one SQLite transaction."""
+        cid=str(uuid.uuid4())
+        with self._connect() as con:
+            task=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not task:
+                raise ValueError("unknown task_id")
+            task_data=dict(task)
+            payload={"task":task_data,"router_checkpoint":snapshot}
+            state=task_data["state"]
+            created=utc_now()
+            con.execute("INSERT INTO checkpoints VALUES(?,?,?,?,?)",
+                        (cid,task_id,state,json.dumps(payload,ensure_ascii=False,sort_keys=True,default=str),created))
+            self._audit(con,task_data["project_id"],task_id,"ROUTER_CHECKPOINT_CREATED",actor,
+                        "Tool Router stage checkpoint persisted",state,state,
+                        {"checkpoint_id":cid,"stage":snapshot.get("stage"),"candidate_id":snapshot.get("candidate_id")})
+        return {"checkpoint_id":cid,"task_id":task_id,"state":state,"created_at":created}
+
     def restore_checkpoint(self,task_id:str,checkpoint_id:str,actor:str="system",reason:str="Approved recovery") -> dict[str,Any]:
         """Restore safe workflow metadata from a checkpoint; never auto-resume EXECUTE."""
         safe_states={State.RESEARCH,State.PLAN,State.POLICY,State.VERIFY,State.AUDIT}
