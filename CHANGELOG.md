@@ -48,3 +48,9 @@
 - Moved VERIFIED evidence creation behind trusted HTTPS fetch + quote match, pinned the connection to a validated public IP while preserving TLS hostname checks, and added task-scoped evidence with additive SQLite migration.
 - Consulted Anchor files only as references; recorded a boundary that excludes wholesale copying of their workflow, schema, code or project artifacts.
 - CI run #159 passed 67 tests on Python 3.11, 3.12 and 3.13. Live OpenAI provider access, code writing/execution, production deployment, production identity/tenant isolation and ChatGPT mobile integration remain NOT RUN/BLOCKED.
+
+
+## 2026-10-10 — Record privacy and contract validation
+- Strengthened the operational record storage boundary to reject common credential-bearing and raw prompt/argument/output/code/patch fields recursively; redacted token counts and code hashes remain allowed.
+- Added an OpenAPI contract test for YAML parsing, shared service version, required REST routes, verified-evidence rules and code-proposal path scope; CI runs it separately and in the full suite.
+- CI run #174 passed the 4 OpenAPI checks and 73 tests on Python 3.11, 3.12 and 3.13. Production security, live provider, deployment and ChatGPT mobile integration remain NOT RUN/BLOCKED.
