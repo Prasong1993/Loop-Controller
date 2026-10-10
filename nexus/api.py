@@ -375,13 +375,14 @@ def transition(task_id:str,body:TransitionIn,request:Request,idempotency_key:str
         if not idempotency_key or not idempotency_key.strip():
             raise HTTPException(status_code=428,detail={"code":"IDEMPOTENCY_KEY_REQUIRED",
                 "message":"Idempotency-Key is required before entering EXECUTE."})
-        fingerprint=json.dumps({"task_id":task_id,"to_state":body.to_state,"actor":body.actor,
+        principal=getattr(request.state,"principal","")
+        fingerprint=json.dumps({"task_id":task_id,"to_state":body.to_state,"actor":principal,
             "reason":body.reason,"result":body.result,"error_code":body.error_code},sort_keys=True,separators=(",",":"))
         try:
             existing=idempotency_store.claim(idempotency_key.strip(),scope=f"task:{task_id}:transition",fingerprint=fingerprint)
             if existing["status"]=="COMPLETED":
                 return existing["response"]
-            response=invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
+            response=invoke(controller.transition,task_id,body.to_state,getattr(request.state,"principal","api"),body.reason,body.result,body.error_code)
             idempotency_store.complete(idempotency_key.strip(),response)
             return response
         except IdempotencyConflict as exc:
@@ -393,14 +394,17 @@ def transition(task_id:str,body:TransitionIn,request:Request,idempotency_key:str
             except Exception as ledger_exc:
                 raise HTTPException(status_code=503,detail={"code":"IDEMPOTENCY_LEDGER_UNAVAILABLE","message":"Could not persist execution outcome; stop and reconcile before retry."}) from ledger_exc
             raise
-    return invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
+    return invoke(controller.transition,task_id,body.to_state,getattr(request.state,"principal","api"),body.reason,body.result,body.error_code)
 
 @app.post("/tasks/{task_id}/verification",dependencies=[Depends(require_project_access)])
 def record_task_verification(task_id:str,body:VerificationIn,request:Request):
     task=invoke(controller.get_task,task_id)
     request.state.project_id=task["project_id"]
     request.state.task_id=task_id
-    return invoke(controller.record_verification,task_id,body.verifier,body.evidence_id,body.result_sha256,body.notes)
+    principal=getattr(request.state,"principal","")
+    if body.verifier!=principal:
+        raise HTTPException(status_code=403,detail={"code":"VERIFIER_IDENTITY_MISMATCH","message":"verifier must match the authenticated principal."})
+    return invoke(controller.record_verification,task_id,principal,body.evidence_id,body.result_sha256,body.notes)
 
 @app.get("/tasks/{task_id}/verification",dependencies=[Depends(require_project_access)])
 def get_task_verifications(task_id:str,request:Request):
