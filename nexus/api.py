@@ -31,6 +31,7 @@ async def operational_record_middleware(request: Request, call_next):
     trace_id=request.headers.get("x-request-id","").strip()
     if not trace_id or len(trace_id)>128:
         trace_id=str(uuid.uuid4())
+    request.state.trace_id=trace_id
     try:
         response=await call_next(request)
         status_code=response.status_code
@@ -139,6 +140,7 @@ def require_api_key(request:Request, authorization:str|None=Header(default=None)
 def invoke(fn,*args,**kwargs):
     try: return fn(*args,**kwargs)
     except PolicyDenied as exc: raise HTTPException(status_code=403,detail=str(exc)) from exc
+    except EvidenceFetchError as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
     except ValueError as exc:
         message=str(exc)
         status=404 if message.startswith("unknown ") else 409
@@ -195,7 +197,7 @@ def propose_ai_plan(body:AIPlanIn,request:Request):
     # A request-level checkbox alone cannot enable paid API usage: the deployment
     # operator must also set the server-side budget gate.
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
-    trace_id=request.headers.get("x-request-id") or str(uuid.uuid4())
+    trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     try:
         return plan_generator.propose(project_id=body.project_id,task=body.task,
             constraints=body.constraints,capabilities=body.capabilities,
@@ -221,7 +223,7 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
     if not (body.budget_approved and budget_gate):
         try:
             record_store.append(project_id=body.project_id,record_type="decision",
-                trace_id=request.headers.get("x-request-id") or str(uuid.uuid4()),
+                trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4()),
                 actor_type="system",component="openai_responses",status="BLOCK",
                 error_code="OPENAI_BUDGET_APPROVAL_REQUIRED",summary="OpenAI tool run blocked by budget gate",
                 payload={"decision":"BLOCK","reason_code":"OPENAI_BUDGET_APPROVAL_REQUIRED"})
@@ -248,7 +250,7 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         if args.get("project_id") != body.project_id:
             return {"decision":"BLOCK","reason_code":"PROJECT_SCOPE_MISMATCH"}
         return {"decision":"ALLOW","reason_code":"READ_ONLY_PROJECT_SCOPED"}
-    trace_id=request.headers.get("x-request-id") or str(uuid.uuid4())
+    trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     def record(**event):
         record_type=event.pop("record_type","usage")
         payload={k:v for k,v in event.items() if k not in {"prompt","arguments","output","api_key"}}
