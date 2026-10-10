@@ -208,3 +208,59 @@ The purpose of staged review is to catch compatibility defects by inspecting cod
 - [ ] The final report distinguishes code review from executed tests and cites the exact delivered revision and actual CI results.
 - [ ] No required test, approval, or safety gate is bypassed merely to reduce tool calls.
 
+## 15. Evidence-first staged workflow and project evidence repository
+
+The user's required workflow is a staged, evidence-first pipeline, inspired by the user's requested NASA-style reference model. Treat the workflow below as a project requirement; do not claim that every detail is an official NASA process unless it is separately verified against authoritative NASA sources. The purpose is to collect and screen evidence once near the beginning, preserve its provenance in a project-scoped central evidence repository, and let later stages reuse progressively refined evidence instead of repeatedly starting research from scratch.
+
+### A. Stage 1 — intake, research, screening, and evidence curation
+
+- Interpret the task, decompose it into the information and decisions needed across the full workflow, and identify acceptance criteria, constraints, and evidence needs.
+- Collect relevant source material broadly enough to cover the task, prioritizing official, primary, current, and independently verifiable sources. Record source URI/ID, title, publisher/owner, revision/version, retrieval date, relevant passage or data location, and verification method.
+- Screen and classify evidence for authority, freshness, relevance, applicability, completeness, contradiction, and limitations. Preserve the distinction between VERIFIED, RECOVERED, UNKNOWN, and BLOCKED; an unverified item must not be promoted to confirmed evidence.
+- Store the screened evidence and its provenance in the central evidence repository for this project. Keep candidate/background evidence separate from the curated evidence set approved for a particular task or stage. The repository is reusable, but evidence is not automatically applicable to every task merely because it is stored there.
+- Produce a curated evidence package with stable evidence IDs, concise findings, source links, scope/applicability, confidence or verification status, known contradictions, and gaps. Stage 1 is the main gate that reduces noise and prevents every later stage from repeating the initial research.
+
+### B. Stage 2 — work from Stage 1's curated evidence
+
+- Begin with the Stage 1 curated package and its recorded conclusions. Do not restart broad research or query original sources again by default when the needed evidence is already available and still current.
+- Use the curated evidence to perform Stage 2's assigned analysis/work, and record which evidence IDs support each important decision or output.
+- If evidence is missing, stale, contradictory, or insufficient for a specific decision, first request/retrieve the relevant supplemental material already screened or indexed by Stage 1. If that cannot resolve the gap, explicitly reopen the appropriate original source/research path, verify the additional material, and add it to the project evidence repository with provenance before relying on it.
+- Keep Stage 2 outputs, derived findings, decisions, and unresolved questions as a traceable work package for the next stage. Clearly distinguish source facts from analysis or derived conclusions.
+
+### C. Stage 3 and every subsequent stage — reuse the nearest validated work first
+
+- Start with the immediately preceding stage's outputs and evidence package because it contains the most task-specific analysis. Do not jump back to raw source research when the prior stage already supplies sufficient, current, verified support.
+- If the previous stage's package is insufficient, consult the relevant curated evidence and references retained by Stage 1. Return to original sources or conduct new research only if those two levels still cannot close the identified gap, or if freshness/contradiction checks require it.
+- When new evidence is acquired, register and verify it, link it to the affected decisions and artifacts, and pass the updated evidence package forward. Never silently replace prior evidence or lose the provenance of a changed conclusion.
+- Repeat this handoff pattern for each later stage until the final delivery/acceptance stage. The next stage receives the prior stage's outputs, relevant evidence IDs, decisions, verification status, unresolved gaps, and required acceptance criteria—not merely an unstructured dump of all collected material.
+
+### D. Evidence retrieval order and re-research rule
+
+Use this default retrieval order for each stage:
+1. The immediately preceding stage's validated outputs and evidence package.
+2. Stage 1's curated project evidence repository and screened supporting references.
+3. Original authoritative sources or new research, only for a specific unresolved gap, stale item, contradiction, or verification need.
+
+This is a reuse-first policy, not a prohibition on fresh research. Evidence must be refreshed when its version/date matters, its applicability is doubtful, a contradiction appears, or the stage's acceptance criteria cannot be met. Record why the evidence was reopened and what changed.
+
+### E. Required stage handoff record
+
+Every stage must produce a structured handoff containing:
+- Stage ID, task/run ID, input revision, output/artifact references, and completion status.
+- Evidence IDs consumed and produced; source provenance; and links from key claims/decisions to supporting evidence.
+- Work performed and decisions made, distinguishing directly sourced facts from derived analysis.
+- Checks actually performed and their results; do not confuse code/reasoning review with an executed test.
+- Missing, conflicting, stale, UNKNOWN, or BLOCKED evidence; assumptions that remain unverified; and any reason the next stage may need to return to an earlier evidence tier.
+- Explicit acceptance criteria and whether the stage is ready for handoff.
+
+### Acceptance criteria
+
+- [ ] Stage 1 gathers, screens, classifies, and stores relevant evidence before downstream work depends on it.
+- [ ] The project evidence repository preserves provenance and distinguishes the general screened pool from task/stage-specific curated evidence.
+- [ ] Stage 2 starts from Stage 1's curated package and does not repeat broad source gathering without a recorded reason.
+- [ ] Stage 3 and later stages prioritize the previous stage's validated package, then Stage 1's curated repository, and only then reopen original sources as needed.
+- [ ] New or refreshed evidence is verified, registered, and linked to affected decisions before being used as confirmed support.
+- [ ] Every stage hands off artifacts, evidence references, status, checks, and unresolved gaps in a structured form.
+- [ ] The final output can trace key conclusions and actions through the stages to source evidence.
+- [ ] NASA-specific claims about the reference model remain unverified until supported by authoritative NASA documentation.
+
