@@ -3,7 +3,6 @@ import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from nexus.api import app
-from unittest.mock import patch
 
 class NexusApiTests(unittest.TestCase):
     def setUp(self):
@@ -85,6 +84,41 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertGreaterEqual(response.json()["total"],1)
         self.assertEqual(response.json()["project_id"],"search-test")
+
+
+    def test_evidence_quote_mismatch_maps_to_422(self):
+        from nexus.evidence import EvidenceFetchError
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            project = self.client.post("/projects", json={"name":"evidence-mismatch"},
+                                       headers={"Authorization":"Bearer test-secret"}).json()
+            with patch("nexus.evidence.verify_source_quote", side_effect=EvidenceFetchError("quote mismatch")):
+                response = self.client.post("/evidence/verify", json={"project_id":project["project_id"],
+                    "claim":"claim","source_url":"https://example.com","quoted_text":"not in source"},
+                    headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,422)
+
+    def test_ai_run_policy_blocks_cross_project_tool_request(self):
+        seen = {}
+        class FakeWorker:
+            def __init__(self, *, model):
+                seen["model"] = model
+            def run(self, **kwargs):
+                seen["tool_names"] = [tool["name"] for tool in kwargs["tools"]]
+                seen["decision"] = kwargs["policy_check"](
+                    "nexus_get_project_status", {"project_id":"different-project"})
+                return {"response_id":"fake-response","output_text":"blocked","tool_calls":[],
+                        "policy_decisions":[seen["decision"]],"rounds":1,"usage":{}}
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            with patch("nexus.api.OpenAIResponsesWorker", FakeWorker):
+                response=self.client.post("/ai/run",json={"project_id":"active-project",
+                    "prompt":"read status","budget_approved":True},
+                    headers={"Authorization":"Bearer test-secret","x-request-id":"test-trace-01"})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(seen["decision"]["decision"],"BLOCK")
+        self.assertEqual(seen["decision"]["reason_code"],"PROJECT_SCOPE_MISMATCH")
+        self.assertEqual(set(seen["tool_names"]),{
+            "nexus_get_project_status","nexus_read_audit","nexus_get_task"})
+        self.assertEqual(response.json()["trace_id"],"test-trace-01")
 
 if __name__ == "__main__":
     unittest.main()
