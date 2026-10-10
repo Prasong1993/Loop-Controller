@@ -382,3 +382,30 @@ The requirement is **one master plus five phase-specific data boundaries**. Duri
 - Database isolation, cross-phase handoffs, and recovery acceptance tests: NOT_RUN until evidenced by test results.
 - Next action: map existing SQLite schema/core/checkpoint/evidence/task APIs to the master-plus-five-phase contract; identify what exists, then implement the smallest high-value gap without merging PR #3.
 
+## 19. Short project aliases and canonical project registry
+
+Decision recorded: users and the controller should be able to refer to projects with short aliases such as **Project 1**, **Project 2**, and **Project 3**, instead of repeatedly typing long project names. The shared meaning of each alias must be stored persistently as part of the authoritative Project Master registry, not held only in conversational memory.
+
+### Canonical mapping
+- Store each alias as a registry entry mapped to an immutable internal `project_id`, a display name, a concise description/purpose, lifecycle status, and creation/update metadata.
+- The alias is a convenient human-facing reference; it is not the primary key and must not replace the immutable `project_id`.
+- Record alias scope explicitly (for example, global to the user's workspace or local to a workspace/tenant). Do not assume aliases are globally unique until the scope is defined.
+- Resolve a phrase such as “Project 2” against the persistent registry before reading or modifying project data. If the alias is unknown, duplicated within its scope, inactive, or ambiguous, stop and ask for clarification rather than guessing.
+- Every task, run, trace, evidence item, checkpoint, and phase record must retain the canonical `project_id`; logs may also retain the alias as it was used for readability.
+- Renaming a display name must not silently change the alias mapping or move records. Alias reassignment/retirement must be an explicit audited operation with collision checks.
+- The registry should support a compact lookup view such as: alias, project ID, display name, purpose, current phase, latest verified commit, checkpoint status, blockers, and next permitted action. Keep this as a curated summary, not a duplicate of all project data.
+- When a new conversation starts, resolve the user's project alias from the registry and reconcile its saved checkpoint with the repository before claiming the project state is current.
+
+### Acceptance tests
+- “Project 1” resolves to the same canonical project ID across separate conversations and sessions.
+- “Project 2” cannot accidentally retrieve Project 1's tasks, evidence, checkpoints, or phase data.
+- Unknown or conflicting aliases fail closed and request clarification.
+- Alias changes are audited and do not rewrite historical canonical IDs.
+- Registry readback agrees with the master checkpoint and repository/branch/commit evidence.
+
+### Current status
+- Requirement/architecture decision: RECORDED in this document.
+- Alias registry and deterministic resolver implemented in runtime: UNKNOWN until source mapping and tests confirm it.
+- Cross-session resolution and cross-project isolation acceptance tests: NOT_RUN.
+- Next action: include the project-alias registry and resolver in the existing master-database/API mapping; reuse the existing project table and stable project IDs where suitable rather than creating a duplicate registry without need.
+- No PR merge authorized.
