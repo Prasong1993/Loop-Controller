@@ -142,3 +142,18 @@ The suite now includes a code-proposal generator using Responses API + strict st
 | NXT-045 | Unreviewed code model override is rejected before provider call | `tests/test_code_proposal.py` | PASS in CI #150 |
 
 **Remaining NOT RUN/BLOCKED:** live OpenAI provider request, workspace write/apply-patch adapter, code execution sandbox, real repository integration from the NEXUS service, remote deployment, production identity/tenant isolation and ChatGPT Android integration.
+
+
+## Latest complete implementation verification — 2026-10-10
+**GitHub Actions run #159:** https://github.com/Prasong1993/Loop-Controller/actions/runs/38015447654  
+Commit: `6e5dcfcd46d2781a315bfefdfa6dbcfd34b53bea`.
+
+| Runtime | Compile | Unit/regression tests | Result |
+|---|---|---|---|
+| Python 3.11 | PASS | 67 tests, 0 failures | PASS |
+| Python 3.12 | PASS | 67 tests, 0 failures | PASS |
+| Python 3.13 | PASS | 67 tests, 0 failures | PASS |
+
+This run covers code proposal generation and path safety, model/capability gating, task/project scope checks, REST operational-record correlation/search, task-scoped evidence, additive database migration, pinned HTTPS transport, double budget gates, structured plan proposals, read-only OpenAI tool policy, and the in-process REST lifecycle.
+
+The subsequent change to README/docs is documentation-only; the next workflow run must still be checked before finalizing the full repository snapshot. Live OpenAI calls, code writes/execution, production deployment/authentication and ChatGPT Android integration remain NOT RUN/BLOCKED.
