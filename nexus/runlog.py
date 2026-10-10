@@ -62,16 +62,17 @@ class RouterRunLog:
     def append(self, run_id: str, event_type: str, details: Mapping[str, Any] | None = None) -> None:
         with self._connect() as con:
             self._append(con, run_id, event_type, dict(details or {}))
-            if event_type == "ROUTE_COMPLETED":
-                con.execute(
-                    "UPDATE router_runs SET status='COMPLETED',finished_at=?,outcome_json=? WHERE run_id=? AND status='RUNNING'",
-                    (_now(), json.dumps(dict(details or {}), ensure_ascii=False, sort_keys=True, default=str), run_id),
-                )
-            elif event_type == "ROUTE_BLOCKED":
-                con.execute(
-                    "UPDATE router_runs SET status='BLOCKED',finished_at=?,outcome_json=? WHERE run_id=? AND status='RUNNING'",
-                    (_now(), json.dumps(dict(details or {}), ensure_ascii=False, sort_keys=True, default=str), run_id),
-                )
+    def finish(self, run_id: str, status: str, outcome: Mapping[str, Any]) -> None:
+        if status not in {"COMPLETED", "BLOCKED", "FAILED"}:
+            raise ValueError("invalid terminal run status")
+        with self._connect() as con:
+            changed = con.execute(
+                "UPDATE router_runs SET status=?,finished_at=?,outcome_json=? WHERE run_id=? AND status='RUNNING'",
+                (status, _now(), json.dumps(dict(outcome), ensure_ascii=False, sort_keys=True, default=str), run_id),
+            ).rowcount
+            if changed != 1:
+                raise ValueError("run is missing or already finalized")
+            self._append(con, run_id, "RUN_FINISHED", {"status": status, "outcome": dict(outcome)})
 
     def _append(self, con: sqlite3.Connection, run_id: str, event_type: str, details: Mapping[str, Any]) -> None:
         sequence = con.execute(
