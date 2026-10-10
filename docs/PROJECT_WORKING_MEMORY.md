@@ -148,3 +148,25 @@ Tool selection and work decomposition must begin at task intake, not after a lon
 - [ ] A dependency-aware work graph identifies parallel tasks, serial dependencies, approval gates, and verification steps.
 - [ ] Final status is reconciled with actual tool evidence; no planned or unlaunched work is reported as executed.
 
+## 13. Skill-family orchestration and parallel work lanes
+
+Treat available skills and capabilities as reusable work patterns that can be applied to multiple independent work units. Do not assume that one skill family can only be used once per task, or that selecting one skill prevents using related tools and other skills. Equally, do not assume the platform supports unlimited duplicate skill instances or unlimited concurrency: inspect actual tool/skill contracts and respect their execution limits.
+
+- At intake, classify work into capability families (for example: research/evidence, repository/code, testing/QA, data analysis, storage/backup, deployment/operations, and independent review) based on the actual available inventory.
+- Split a large task into independent lanes. Multiple lanes may use the same skill family concurrently when each lane has a distinct scope, inputs, output, and acceptance criteria and the tool runtime supports those calls.
+- For each lane, select the appropriate subordinate tools/connectors. A skill guides the method; tools perform the concrete retrieval, edit, execution, or verification. Do not confuse loading a skill's instructions with executing the work.
+- Build a capability map: skill/capability family → eligible tools → supported operations → permissions/credentials → concurrency/rate limits → verification method.
+- Choose the number of concurrent lanes dynamically from task size, independence, tool limits, API quotas, and risk. A number such as five concurrent lanes is a possible target only if the actual environment supports it; never report a concurrency level as available or achieved without evidence.
+- Avoid redundant lanes that repeat the same search or mutate the same resource. Use separate scopes for parallel investigation, then merge results at a defined coordination point. Serialize conflicting writes and approval-gated actions.
+- If a skill or tool is unavailable, not installed, disconnected, or lacks permission, mark that lane BLOCKED/NOT_RUN and continue other independent lanes where possible. Do not let one unavailable tool stop all unrelated work.
+- Record which skill instructions were consulted, which tools actually ran, each lane's inputs/results/status, and the evidence supporting the final synthesis. Do not claim that a skill itself performed an operation unless a corresponding tool/action result confirms it.
+
+### Skill-family orchestration acceptance criteria
+
+- [ ] Relevant installed skills and available tools are inventoried at intake for substantial project work.
+- [ ] Capability families can be reused across multiple independent lanes where supported.
+- [ ] Each lane is mapped to concrete subordinate tools, permissions, dependencies, and verification.
+- [ ] Concurrency is bounded by observed platform/tool limits rather than an arbitrary hard-coded number.
+- [ ] Tool/skill failures are isolated so unrelated work can continue.
+- [ ] The final report distinguishes skill guidance consulted, tool actions executed, and outcomes independently verified.
+
