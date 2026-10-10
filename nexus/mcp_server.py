@@ -16,7 +16,7 @@ from starlette.types import ASGIApp, Scope, Receive, Send
 from mcp.server.fastmcp import FastMCP
 from nexus.core import NEXUS, PolicyDenied
 from nexus.records import RecordStore
-from nexus.evidence import EvidenceFetchError, verify_source_quote
+from nexus.evidence import EvidenceFetchError
 from nexus.version import VERSION
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
@@ -128,10 +128,8 @@ def nexus_add_unverified_evidence(project_id:str,claim:str,status:str,source_url
 @mcp.tool()
 @track_tool
 def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_text:str,notes:str="")->dict:
-    """Fetch a public HTTPS source and record VERIFIED only if the exact normalized quote exists."""
-    proof=verify_source_quote(source_url,quoted_text)
-    return controller.add_verified_evidence(project_id,claim,source_url,proof["quoted_text"],
-                                            proof["source_text"],notes,"chatgpt-source-verifier")
+    """Fetch and verify source content inside the trusted core boundary."""
+    return controller.verify_and_add_evidence(project_id,claim,source_url,quoted_text,notes,"chatgpt-source-verifier")
 
 @mcp.tool()
 @track_tool
