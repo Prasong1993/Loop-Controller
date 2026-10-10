@@ -7,7 +7,7 @@ import socket
 import ssl
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 
 MAX_BYTES = 1_000_000
 TIMEOUT_SECONDS = 8
@@ -66,7 +66,7 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         sock=socket.create_connection((self._pinned_ip,self.port),self.timeout,self.source_address)
         self.sock=self._context.wrap_socket(sock,server_hostname=self.host)
 
-class _PinnedHTTPSHandler(HTTPSRedirectHandler):
+class _PinnedHTTPSHandler(HTTPSHandler):
     def __init__(self, pinned_ip, context=None):
         super().__init__()
         self.pinned_ip=pinned_ip
