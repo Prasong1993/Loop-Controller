@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Protocol
 
+from nexus.runlog import RouterRunLog
+
 
 class Adapter(Protocol):
     def preflight(self) -> Mapping[str, Any]:
@@ -65,6 +67,7 @@ class ToolRouter:
         if controller is None or not callable(getattr(controller, "record_router_checkpoint", None)):
             raise ValueError("a persistent controller with record_router_checkpoint() is required")
         self._controller = controller
+        self._runlog = RouterRunLog(controller.database)
         self._audit_sink = audit_sink
         self._checkpoint_sink = checkpoint_sink
 
@@ -78,10 +81,21 @@ class ToolRouter:
     ) -> RouteResult:
         events: list[dict[str, Any]] = []
         checkpoints: list[dict[str, Any]] = []
+        task_id = task.get("task_id")
+        if not task_id:
+            raise ValueError("task.task_id is required for durable run logging")
+        eligible_ids = [
+            c.id for c in candidates
+            if c.enabled and c.permission_ok and c.capability_ok and not c.warning
+            and (c.cost_tier == "free" or (c.cost_tier == "paid" and allow_paid and budget_approved))
+        ]
+        run_id = self._runlog.start(str(task_id), eligible_ids)
 
         def record(event_type: str, **details: Any) -> None:
-            event = {"event_type": event_type, **details}
+            event = {"event_type": event_type, "run_id": run_id, **details}
             events.append(event)
+            # Durable append happens before optional observers; a logging failure fails closed.
+            self._runlog.append(run_id, event_type, details)
             if self._audit_sink:
                 self._audit_sink(event)
 
@@ -94,6 +108,7 @@ class ToolRouter:
             # If SQLite write fails, the exception stops the route before execution.
             saved = self._controller.record_router_checkpoint(task_id, item)
             item["checkpoint_id"] = saved["checkpoint_id"]
+            self._runlog.append(run_id, "CHECKPOINT_PERSISTED", item)
             checkpoints.append(item)
             if self._checkpoint_sink:
                 self._checkpoint_sink(item)
