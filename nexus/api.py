@@ -11,7 +11,7 @@ import time
 import uuid
 from nexus.records import RecordStore
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from nexus.core import NEXUS, PolicyDenied
 from nexus.evidence import EvidenceFetchError
 from nexus.openai_adapter import OpenAIResponsesWorker, OpenAIWorkerError
@@ -81,25 +81,45 @@ async def operational_record_middleware(request: Request, call_next):
 
 class ProjectIn(BaseModel):
     name:str=Field(min_length=1,max_length=200)
+    @field_validator("name")
+    @classmethod
+    def nonblank_name(cls,value):
+        if not value.strip(): raise ValueError("name must not be blank")
+        return value.strip()
 class TaskIn(BaseModel):
-    project_id:str
+    project_id:str=Field(min_length=1,max_length=200)
     title:str=Field(min_length=1,max_length=500)
     expected_outcome:str=""
     verification_method:str=""
+    @field_validator("project_id","title")
+    @classmethod
+    def nonblank_task_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 class EvidenceIn(BaseModel):
-    project_id:str
+    project_id:str=Field(min_length=1,max_length=200)
     claim:str=Field(min_length=1,max_length=2000)
     status:str
     source_url:str|None=None
     notes:str=""
     task_id:str|None=None
+    @field_validator("project_id","claim")
+    @classmethod
+    def nonblank_evidence_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 class VerifyEvidenceIn(BaseModel):
-    project_id:str
+    project_id:str=Field(min_length=1,max_length=200)
     claim:str=Field(min_length=1,max_length=2000)
     source_url:str=Field(min_length=1,max_length=2000)
     quoted_text:str=Field(min_length=1,max_length=5000)
     notes:str=""
     task_id:str|None=None
+    @field_validator("project_id","claim","source_url","quoted_text")
+    @classmethod
+    def nonblank_verification_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 class TransitionIn(BaseModel):
     to_state:str
     actor:str="api"
@@ -120,10 +140,20 @@ class AIPlanIn(BaseModel):
     constraints:list[str]=Field(default_factory=list,max_length=100)
     capabilities:list[str]=Field(default_factory=list,max_length=2)
     budget_approved:bool=False
+    @field_validator("project_id","task")
+    @classmethod
+    def nonblank_plan_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 class AIRunIn(BaseModel):
     project_id:str=Field(min_length=1,max_length=200)
     prompt:str=Field(min_length=1,max_length=20000)
     budget_approved:bool=False
+    @field_validator("project_id","prompt")
+    @classmethod
+    def nonblank_run_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 
 def require_api_key(request:Request, authorization:str|None=Header(default=None)):
     expected=os.getenv("NEXUS_API_KEY","").strip()
