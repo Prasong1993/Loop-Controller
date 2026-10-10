@@ -48,6 +48,35 @@ class NexusCoreTests(unittest.TestCase):
     def test_audit_created_for_transitions(self):
         t=self.n.create_task(self.project,"audit"); self.n.transition(t["task_id"],"RESEARCH")
         self.assertGreaterEqual(len(self.n.audit(self.project,t["task_id"])),2)
+
+    def test_checkpoint_restore_from_blocked_state(self):
+        t=self.n.create_task(self.project,"recover")
+        self.n.transition(t["task_id"],"RESEARCH")
+        cp=self.n.checkpoint(t["task_id"])["checkpoint_id"]
+        self.n.transition(t["task_id"],"BLOCKED",reason="test interruption")
+        restored=self.n.restore_checkpoint(t["task_id"],cp,reason="test recovery")
+        self.assertEqual(restored["state"],"RESEARCH")
+        self.assertIn("CHECKPOINT_RESTORED", [e["event_type"] for e in self.n.audit(self.project,t["task_id"])])
+
+    def test_checkpoint_restore_rejected_from_non_recovery_state(self):
+        t=self.n.create_task(self.project,"restore gate")
+        self.n.transition(t["task_id"],"RESEARCH")
+        cp=self.n.checkpoint(t["task_id"])["checkpoint_id"]
+        with self.assertRaises(PolicyDenied):
+            self.n.restore_checkpoint(t["task_id"],cp)
+
+    def test_checkpoint_restore_never_replays_execute_state(self):
+        t=self.n.create_task(self.project,"unsafe restore","result","verify")
+        self.n.transition(t["task_id"],"RESEARCH")
+        self.n.add_evidence(self.project,"official fact","VERIFIED","https://example.com")
+        self.n.transition(t["task_id"],"PLAN")
+        self.n.transition(t["task_id"],"POLICY")
+        self.n.transition(t["task_id"],"EXECUTE")
+        cp=self.n.checkpoint(t["task_id"])["checkpoint_id"]
+        self.n.transition(t["task_id"],"RECOVER")
+        with self.assertRaises(PolicyDenied):
+            self.n.restore_checkpoint(t["task_id"],cp)
+
     def test_unknown_project_rejected(self):
         with self.assertRaises(ValueError): self.n.create_task("missing-project","fail")
 
