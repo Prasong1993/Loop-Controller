@@ -120,3 +120,22 @@ Each repair group must include callers, schemas, tests, OpenAPI/docs, and compat
 - Public deployment/TLS/production identity: **NOT VERIFIED**.
 - ChatGPT app registration and live mobile acceptance: **NOT RUN / BLOCKED**.
 - Overall release status: **NOT READY**.
+
+
+## Follow-up implementation pass — 2026-10-10
+This update records source changes made after the initial static audit. It does **not** itself certify the release.
+
+| Finding | Current code disposition | Verification status |
+|---|---|---|
+| NX-A01 — forged VERIFIED evidence via caller-supplied source text | Core legacy method now denies caller-supplied source text; `verify_and_add_evidence` fetches and matches a quote inside the trusted core boundary; project existence is checked before outbound fetch. | FIX IMPLEMENTED; unit/CI status must be checked on the latest commit. |
+| NX-A02 — DNS validation/connection TOCTOU | HTTPS fetch uses a pinned validated public IP and TLS hostname verification; redirects remain blocked; body and timeout bounds remain. | FIX IMPLEMENTED; current unit tests cover handler type and private DNS denial; no live adversarial network test. |
+| NX-A03 — version mismatch | REST and MCP health read `nexus/version.py` (0.4.0). | STATIC READ-BACK REQUIRED; CI check pending. |
+| NX-A04 — no end-to-end lifecycle/API contract verification | Added evidence-boundary, budget-gate, record-search, OpenAI tool-scope and usage-accounting tests. | PARTIAL; no remote E2E, live provider call or ChatGPT mobile invocation. |
+| NX-A05 — inconsistent error mapping | `EvidenceFetchError` maps to HTTP 422 before generic `ValueError`; common error mapping remains incomplete for all REST/MCP paths. | PARTIAL. |
+| NX-A06 — evidence not tied to task/claim requirements | Evidence remains project-scoped; no requirement/claim ID linkage or freshness gate has been implemented. | OPEN. |
+| NX-A07 — validation/record query hardening | Some request length limits and pagination checks exist; whitespace-only validation, filter/date validation, request body limits and audit payload policy need further review. | OPEN. |
+| NX-A08 — checkpoint concurrency/idempotency | Existing unsafe execute-state restore guard remains; compare-and-swap/revision and concurrent restore proof are still missing. | OPEN. |
+| NX-A09 — shared bearer token / tenant isolation | Prototype auth remains shared-key based. | RELEASE BLOCKER. |
+| NX-A10 — deployed ChatGPT/mobile integration | No public endpoint or account registration/live invocation verified. Official Help page checked 2026-10-10 states full MCP write support is rolling out to Business/Enterprise/Edu; current user plan/account access is not established. | BLOCKED / NOT TESTED. |
+
+OpenAI wiring now separates structured proposal generation from a read-only tool orchestration endpoint. Both require a request-level approval and a server-side budget flag. The default model was updated to `gpt-6-luna` based on the official model catalog inspected 2026-10-10; actual account access and current billing remain unverified. Code Interpreter is intentionally not enabled.
