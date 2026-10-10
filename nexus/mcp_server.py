@@ -95,6 +95,18 @@ def nexus_get_task(task_id:str)->dict:
 
 @mcp.tool()
 @track_tool
+def nexus_add_task_dependency(task_id:str,depends_on_task_id:str)->dict:
+    """Add a same-project dependency before the policy gate; cycles and cross-project links are denied."""
+    return controller.add_task_dependency(task_id,depends_on_task_id,"chatgpt")
+
+@mcp.tool()
+@track_tool
+def nexus_get_task_dependencies(task_id:str)->list[dict]:
+    """Read a task's dependency list and current dependency states."""
+    return controller.get_task_dependencies(task_id)
+
+@mcp.tool()
+@track_tool
 def nexus_get_project_status(project_id:str)->dict:
     """Read project status, task counts and evidence counts."""
     return controller.status(project_id)
