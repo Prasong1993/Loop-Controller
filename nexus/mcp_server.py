@@ -7,16 +7,63 @@ ChatGPT MCP app configuration but is not registered/deployed automatically.
 from __future__ import annotations
 import hmac
 import os
+import time
+import uuid
+import functools
+import inspect
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Scope, Receive, Send
 from mcp.server.fastmcp import FastMCP
 from nexus.core import NEXUS, PolicyDenied
+from nexus.records import RecordStore
 from nexus.evidence import EvidenceFetchError, verify_source_quote
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
+record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+
+def track_tool(fn):
+    """Automatically record MCP tool usage and failures without persisting arguments."""
+    signature=inspect.signature(fn)
+    @functools.wraps(fn)
+    def wrapped(*args,**kwargs):
+        started=time.monotonic()
+        trace_id=str(uuid.uuid4())
+        bound=signature.bind_partial(*args,**kwargs)
+        values=bound.arguments
+        project_id=str(values.get("project_id") or "system")
+        task_id=values.get("task_id")
+        outcome="SUCCESS"
+        error_code=None
+        try:
+            return fn(*args,**kwargs)
+        except Exception as exc:
+            outcome="FAILED"
+            error_code=type(exc).__name__.upper()[:80]
+            try:
+                record_store.append(project_id=project_id,task_id=task_id,
+                    record_type="error",trace_id=trace_id,actor_type="tool",
+                    component="mcp_server",status="FAILED",error_code=error_code,
+                    severity="medium",summary=f"MCP tool {fn.__name__} failed",
+                    payload={"category":"tool","tool":fn.__name__,
+                             "exception_class":type(exc).__name__,"retryable":False})
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                record_store.append(project_id=project_id,task_id=task_id,
+                    record_type="usage",trace_id=trace_id,actor_type="tool",
+                    component="mcp_server",status=outcome,
+                    summary=f"MCP tool {fn.__name__}",
+                    payload={"operation":fn.__name__,"duration_ms":max(0,int((time.monotonic()-started)*1000)),
+                             "outcome":outcome,"error_code":error_code})
+            except Exception:
+                pass
+    return wrapped
 mcp=FastMCP("NEXUS Controller",stateless_http=True,json_response=True)
 
 @mcp.tool()
+@track_tool
 def nexus_health()->dict:
     """Return controller liveness and integration version."""
     return {"status":"ok","service":"nexus-controller","version":"0.3.0"}
