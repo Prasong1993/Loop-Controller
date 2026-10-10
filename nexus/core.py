@@ -143,6 +143,30 @@ class NEXUS:
                         task["state"],task["state"],{"checkpoint_id":cid})
         return {"checkpoint_id":cid,"task_id":task_id,"state":task["state"]}
 
+    def restore_checkpoint(self,task_id:str,checkpoint_id:str,actor:str="system",reason:str="Approved recovery") -> dict[str,Any]:
+        """Restore safe workflow metadata from a checkpoint; never auto-resume EXECUTE."""
+        safe_states={State.RESEARCH,State.PLAN,State.POLICY,State.VERIFY,State.AUDIT}
+        with self._connect() as con:
+            task=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not task: raise ValueError("unknown task_id")
+            checkpoint=con.execute("SELECT * FROM checkpoints WHERE checkpoint_id=? AND task_id=?",
+                                   (checkpoint_id,task_id)).fetchone()
+            if not checkpoint: raise ValueError("unknown checkpoint for task")
+            current=State(task["state"]); target=State(checkpoint["state"])
+            if current not in {State.BLOCKED,State.RECOVER}:
+                raise PolicyDenied("restore requires task state BLOCKED or RECOVER")
+            if target not in safe_states:
+                raise PolicyDenied("checkpoint state is not safe for automatic restore")
+            snapshot=json.loads(checkpoint["snapshot_json"])
+            # Restore only workflow metadata. Never restore side-effecting execution as if it had not run.
+            now=utc_now()
+            con.execute("UPDATE tasks SET state=?,expected_outcome=?,verification_method=?,result=?,error_code=?,updated_at=? WHERE task_id=?",
+                        (target.value,snapshot.get("expected_outcome",""),snapshot.get("verification_method",""),
+                         snapshot.get("result",""),snapshot.get("error_code",""),now,task_id))
+            self._audit(con,task["project_id"],task_id,"CHECKPOINT_RESTORED",actor,reason,
+                        current.value,target.value,{"checkpoint_id":checkpoint_id,"safe_restore":True})
+            return dict(con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone())
+
     def audit(self,project_id:str,task_id:str|None=None)->list[dict[str,Any]]:
         with self._connect() as con:
             if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
