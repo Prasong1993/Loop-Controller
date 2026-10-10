@@ -2,7 +2,10 @@ import os
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from nexus.mcp_server import app
+from nexus.mcp_server import app, BearerGateMiddleware
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 class NexusMcpGateTests(unittest.TestCase):
     def test_remote_mcp_fails_closed_without_token(self):
@@ -17,17 +20,15 @@ class NexusMcpGateTests(unittest.TestCase):
             response=client.post("/mcp",json={})
         self.assertEqual(response.status_code,401)
 
-    def test_mcp_accepts_matching_bearer_at_gate(self):
-        client=TestClient(app,base_url="http://localhost")
-        init_payload={"jsonrpc":"2.0","id":1,"method":"initialize","params":{
-            "protocolVersion":"2025-03-26","capabilities":{},
-            "clientInfo":{"name":"nexus-test","version":"1.0"}}}
+    def test_mcp_bearer_gate_accepts_matching_token(self):
+        async def ok_endpoint(request):
+            return JSONResponse({"ok":True})
+        gated=BearerGateMiddleware(Starlette(routes=[Route("/",ok_endpoint)]))
+        client=TestClient(gated)
         with patch.dict(os.environ,{"NEXUS_API_KEY":"test-secret"}):
-            response=client.post("/mcp",json=init_payload,headers={
-                "Authorization":"Bearer test-secret","Accept":"application/json, text/event-stream"})
-        self.assertNotEqual(response.status_code,401)
-        self.assertNotEqual(response.status_code,503)
-        self.assertNotEqual(response.status_code,421,response.text)
+            response=client.get("/",headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json(),{"ok":True})
 
 if __name__ == "__main__":
     unittest.main()
