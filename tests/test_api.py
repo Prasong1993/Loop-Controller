@@ -167,8 +167,27 @@ class NexusApiTests(unittest.TestCase):
             self.assertEqual(evidence.status_code,200,evidence.text)
             self.assertEqual(evidence.json()["status"],"VERIFIED")
             for state in ["PLAN","POLICY","EXECUTE","VERIFY","AUDIT"]:
-                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=headers)
+                state_headers={**headers,"Idempotency-Key":"lifecycle-execute-v1"} if state=="EXECUTE" else headers
+                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=state_headers)
                 self.assertEqual(response.status_code,200,response.text)
+            # Verification is only recordable while the task is in VERIFY.
+            verification=self.client.post(f"/tasks/{task_id}/verification",json={
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"independent-reviewer",
+                "notes":"integration acceptance check"},headers=headers)
+            self.assertEqual(verification.status_code,403)
+            recover=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"RECOVER","reason":"verification gate"},headers=headers)
+            self.assertEqual(recover.status_code,200,recover.text)
+            verify_again=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"VERIFY","reason":"independent verification"},headers=headers)
+            self.assertEqual(verify_again.status_code,200,verify_again.text)
+            verification=self.client.post(f"/tasks/{task_id}/verification",json={
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"independent-reviewer",
+                "notes":"integration acceptance check"},headers=headers)
+            self.assertEqual(verification.status_code,200,verification.text)
+            readback=self.client.get(f"/tasks/{task_id}/verification",headers=headers)
+            self.assertEqual(readback.status_code,200)
+            self.assertEqual(readback.json()[0]["verification_id"],verification.json()["verification_id"])
+            audit_state=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"AUDIT"},headers=headers)
+            self.assertEqual(audit_state.status_code,200,audit_state.text)
             completed=self.client.post(f"/tasks/{task_id}/transition",json={
                 "to_state":"COMPLETE","result":"verified result"},headers=headers)
             self.assertEqual(completed.status_code,200,completed.text)
