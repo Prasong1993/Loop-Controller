@@ -38,6 +38,7 @@ Any missing permission, required evidence, budget approval, tool registration or
 10. Health endpoints and static CI do not prove a remote service is deployed or usable from ChatGPT mobile.
 
 ## 5. State and record map
+- Evidence records have optional `task_id`: task-scoped VERIFIED evidence unlocks only that task; evidence with no task_id is explicitly project-wide and may support any task in that project. Cross-project task links are rejected. Existing SQLite databases are migrated by adding the nullable column and index.
 - Workflow states: `INTAKE → RESEARCH → PLAN → POLICY → EXECUTE → VERIFY → AUDIT → COMPLETE`; `RECOVER` and `BLOCKED` are controlled exception states.
 - Operational record types: `usage`, `error`, `evidence`, `decision`, `checkpoint`, `verification`.
 - Correlation keys: `project_id`, `task_id`, `session_id`, `trace_id`, `operation_id`; sensitive request/response bodies should not be persisted.
