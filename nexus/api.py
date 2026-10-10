@@ -143,6 +143,13 @@ class RestoreIn(BaseModel):
     checkpoint_id:str=Field(min_length=1)
     actor:str="api"
     reason:str="Approved recovery"
+class DependencyIn(BaseModel):
+    depends_on_task_id:str=Field(min_length=1,max_length=200)
+    @field_validator("depends_on_task_id")
+    @classmethod
+    def nonblank_dependency_id(cls,value):
+        if not value.strip(): raise ValueError("depends_on_task_id must not be blank")
+        return value.strip()
 class AIPlanIn(BaseModel):
     project_id:str=Field(min_length=1,max_length=200)
     task:str=Field(min_length=1,max_length=20000)
@@ -217,6 +224,19 @@ def create_task(body:TaskIn,request:Request):
     return result
 @app.get("/tasks/{task_id}",dependencies=[Depends(require_api_key)])
 def get_task(task_id:str): return invoke(controller.get_task,task_id)
+@app.post("/tasks/{task_id}/dependencies",status_code=201,dependencies=[Depends(require_api_key)])
+def add_task_dependency(task_id:str,body:DependencyIn,request:Request):
+    task=invoke(controller.get_task,task_id)
+    request.state.project_id=task["project_id"]
+    request.state.task_id=task_id
+    return invoke(controller.add_task_dependency,task_id,body.depends_on_task_id,"api")
+
+@app.get("/tasks/{task_id}/dependencies",dependencies=[Depends(require_api_key)])
+def get_task_dependencies(task_id:str,request:Request):
+    task=invoke(controller.get_task,task_id)
+    request.state.project_id=task["project_id"]
+    request.state.task_id=task_id
+    return invoke(controller.get_task_dependencies,task_id)
 @app.post("/tasks/{task_id}/transition",dependencies=[Depends(require_api_key)])
 def transition(task_id:str,body:TransitionIn):
     return invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
