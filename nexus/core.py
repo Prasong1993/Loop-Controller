@@ -62,7 +62,15 @@ class NEXUS:
               created_at TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{}');
             CREATE TABLE IF NOT EXISTS checkpoints(checkpoint_id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(task_id),
               state TEXT NOT NULL,snapshot_json TEXT NOT NULL,created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS task_dependencies(
+              task_id TEXT NOT NULL REFERENCES tasks(task_id),
+              depends_on_task_id TEXT NOT NULL REFERENCES tasks(task_id),
+              created_at TEXT NOT NULL,
+              PRIMARY KEY(task_id,depends_on_task_id),
+              CHECK(task_id <> depends_on_task_id)
+            );
             CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+            CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);
             CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence(project_id);
             CREATE INDEX IF NOT EXISTS idx_audit_task ON audit_log(task_id);
             """)
@@ -100,6 +108,57 @@ class NEXUS:
             row=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
             if not row: raise ValueError("unknown task_id")
             return dict(row)
+
+    def add_task_dependency(self,task_id:str,depends_on_task_id:str,actor:str="user")->dict[str,Any]:
+        """Add a same-project dependency while the task is still being planned; reject cycles."""
+        if task_id == depends_on_task_id:
+            raise PolicyDenied("a task cannot depend on itself")
+        with self._connect() as con:
+            task=con.execute("SELECT * FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not task:
+                raise ValueError("unknown task_id")
+            dependency=con.execute("SELECT * FROM tasks WHERE task_id=?",(depends_on_task_id,)).fetchone()
+            if not dependency:
+                raise ValueError("unknown dependency task_id")
+            if task["project_id"] != dependency["project_id"]:
+                raise PolicyDenied("task dependencies must remain within the same project")
+            if State(task["state"]) not in {State.INTAKE,State.RESEARCH,State.PLAN}:
+                raise PolicyDenied("dependencies can only change before the policy gate")
+            cycle=con.execute("""
+                WITH RECURSIVE reachable(task_id) AS (
+                    SELECT depends_on_task_id FROM task_dependencies WHERE task_id=?
+                    UNION
+                    SELECT d.depends_on_task_id FROM task_dependencies d
+                    JOIN reachable r ON d.task_id=r.task_id
+                )
+                SELECT 1 FROM reachable WHERE task_id=? LIMIT 1
+            """,(depends_on_task_id,task_id)).fetchone()
+            if cycle:
+                raise PolicyDenied("dependency would create a cycle")
+            try:
+                con.execute("INSERT INTO task_dependencies(task_id,depends_on_task_id,created_at) VALUES(?,?,?)",
+                            (task_id,depends_on_task_id,utc_now()))
+            except sqlite3.IntegrityError as exc:
+                if con.execute("SELECT 1 FROM task_dependencies WHERE task_id=? AND depends_on_task_id=?",
+                                (task_id,depends_on_task_id)).fetchone():
+                    raise PolicyDenied("dependency already exists") from exc
+                raise
+            self._audit(con,task["project_id"],task_id,"TASK_DEPENDENCY_ADDED",actor,
+                        "Task dependency added",task["state"],task["state"],
+                        {"depends_on_task_id":depends_on_task_id})
+        return {"task_id":task_id,"depends_on_task_id":depends_on_task_id,"status":dependency["state"]}
+
+    def get_task_dependencies(self,task_id:str)->list[dict[str,Any]]:
+        with self._connect() as con:
+            task=con.execute("SELECT project_id FROM tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not task:
+                raise ValueError("unknown task_id")
+            rows=con.execute("""
+                SELECT d.task_id,d.depends_on_task_id,d.created_at,t.title,t.state
+                FROM task_dependencies d JOIN tasks t ON t.task_id=d.depends_on_task_id
+                WHERE d.task_id=? ORDER BY d.created_at,d.depends_on_task_id
+            """,(task_id,)).fetchall()
+            return [dict(row) for row in rows]
 
     def add_evidence(self,project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="",task_id:str|None=None)->dict[str,Any]:
         try: status=EvidenceStatus(status).value
@@ -174,8 +233,16 @@ class NEXUS:
             if target==State.PLAN:
                 n=con.execute("SELECT COUNT(*) FROM evidence WHERE project_id=? AND status='VERIFIED' AND (task_id=? OR task_id IS NULL)",(row["project_id"],task_id)).fetchone()[0]
                 if n<1: raise PolicyDenied("PLAN requires at least one VERIFIED evidence item")
-            if target==State.EXECUTE and (not row["expected_outcome"].strip() or not row["verification_method"].strip()):
-                raise PolicyDenied("EXECUTE requires expected_outcome and verification_method")
+            if target==State.EXECUTE:
+                if not row["expected_outcome"].strip() or not row["verification_method"].strip():
+                    raise PolicyDenied("EXECUTE requires expected_outcome and verification_method")
+                pending=con.execute("""
+                    SELECT d.depends_on_task_id,t.state FROM task_dependencies d
+                    JOIN tasks t ON t.task_id=d.depends_on_task_id
+                    WHERE d.task_id=? AND t.state <> ?
+                """,(task_id,State.COMPLETE.value)).fetchall()
+                if pending:
+                    raise PolicyDenied("EXECUTE requires all task dependencies to be COMPLETE")
             if target==State.COMPLETE and (current!=State.AUDIT or not (result or row["result"]).strip()):
                 raise PolicyDenied("COMPLETE requires AUDIT state and a recorded result")
             now=utc_now()
