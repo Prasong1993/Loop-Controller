@@ -32,6 +32,23 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(accepted.status_code, 201)
 
 
+    def test_project_level_authorization_denies_cross_tenant_reads_and_writes(self):
+        tokens={"alice-token":"alice","bob-token":"bob"}
+        auth_env=patch.dict(os.environ,{"NEXUS_API_TOKENS":__import__("json").dumps(tokens),"NEXUS_API_KEY":""})
+        auth_env.start()
+        self.addCleanup(auth_env.stop)
+        alice={"Authorization":"Bearer alice-token"}
+        bob={"Authorization":"Bearer bob-token"}
+        created=self.client.post("/projects",json={"name":"alice-private-project"},headers=alice)
+        self.assertEqual(created.status_code,201,created.text)
+        project_id=created.json()["project_id"]
+        denied_status=self.client.get(f"/projects/{project_id}/status",headers=bob)
+        self.assertEqual(denied_status.status_code,403,denied_status.text)
+        denied_task=self.client.post("/tasks",json={"project_id":project_id,"title":"bob injection"},headers=bob)
+        self.assertEqual(denied_task.status_code,403,denied_task.text)
+        allowed_status=self.client.get(f"/projects/{project_id}/status",headers=alice)
+        self.assertEqual(allowed_status.status_code,200,allowed_status.text)
+
     def test_direct_verified_evidence_is_denied(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
             project = self.client.post("/projects", json={"name":"evidence-deny"},
