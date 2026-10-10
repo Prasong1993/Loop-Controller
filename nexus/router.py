@@ -113,6 +113,11 @@ class ToolRouter:
             if self._checkpoint_sink:
                 self._checkpoint_sink(item)
 
+        def blocked(candidate_id: str, reason: str) -> RouteResult:
+            result = self._blocked(candidate_id, reason, events, checkpoints, record, checkpoint)
+            self._runlog.finish(run_id, "BLOCKED", {"candidate_id": candidate_id, "reason": reason})
+            return result
+
         eligible = [
             c for c in candidates
             if c.enabled and c.permission_ok and c.capability_ok and not c.warning
@@ -132,6 +137,7 @@ class ToolRouter:
             )
             record("ROUTE_BLOCKED", reason=reason, unsupported_tiers=unsupported_tiers)
             checkpoint("ROUTE_BLOCKED", reason=reason)
+            self._runlog.finish(run_id, "BLOCKED", {"reason": reason})
             return RouteResult("BLOCKED", None, reason=reason, events=events, checkpoints=checkpoints)
 
         for candidate in ordered:
@@ -141,11 +147,11 @@ class ToolRouter:
             except ProviderError as exc:
                 record("PREFLIGHT_ERROR", candidate_id=candidate.id, code=exc.code)
                 if not exc.fallback_safe:
-                    return self._blocked(candidate.id, f"unsafe preflight failure: {exc.code}", events, checkpoints, record, checkpoint)
+                    return blocked(candidate.id, f"unsafe preflight failure: {exc.code}")
                 continue
             except Exception:
                 record("PREFLIGHT_ERROR", candidate_id=candidate.id, code="UNCLASSIFIED")
-                return self._blocked(candidate.id, "unclassified preflight failure; stopped to avoid unsafe retry", events, checkpoints, record, checkpoint)
+                return blocked(candidate.id, "unclassified preflight failure; stopped to avoid unsafe retry")
 
             if status.get("warning") or status.get("available") is not True or status.get("quota_available") is not True:
                 reason = str(status.get("reason") or "unavailable, warning present, or quota not confirmed")
@@ -161,17 +167,17 @@ class ToolRouter:
                 checkpoint("EXECUTION_ERROR", candidate_id=candidate.id, code=exc.code)
                 if exc.fallback_safe:
                     continue
-                return self._blocked(candidate.id, f"unsafe execution failure: {exc.code}", events, checkpoints, record, checkpoint)
+                return blocked(candidate.id, f"unsafe execution failure: {exc.code}")
             except Exception:
                 record("EXECUTION_ERROR", candidate_id=candidate.id, code="UNCLASSIFIED", fallback_safe=False)
-                return self._blocked(candidate.id, "unclassified execution failure; stopped to avoid unsafe retry", events, checkpoints, record, checkpoint)
+                return blocked(candidate.id, "unclassified execution failure; stopped to avoid unsafe retry")
 
             checkpoint("BEFORE_VERIFY", candidate_id=candidate.id)
             try:
                 verification = candidate.adapter.verify(task, value)
             except Exception:
                 record("VERIFICATION_FAILED", candidate_id=candidate.id, reason="verifier raised an exception")
-                return self._blocked(candidate.id, "verification raised an exception; result not accepted", events, checkpoints, record, checkpoint)
+                return blocked(candidate.id, "verification raised an exception; result not accepted")
 
             if verification is True:
                 verified, verification_details = True, {}
@@ -185,15 +191,17 @@ class ToolRouter:
                 record("VERIFICATION_FAILED", candidate_id=candidate.id, details=verification_details)
                 checkpoint("VERIFICATION_FAILED", candidate_id=candidate.id)
                 # Do not rerun a task on another provider after an unverified side effect.
-                return self._blocked(candidate.id, "result failed verification; fallback stopped to prevent duplicate side effects", events, checkpoints, record, checkpoint)
+                return blocked(candidate.id, "result failed verification; fallback stopped to prevent duplicate side effects")
 
             record("ROUTE_COMPLETED", candidate_id=candidate.id, verified=True, cost_tier=candidate.cost_tier)
             checkpoint("ROUTE_COMPLETED", candidate_id=candidate.id, verified=True)
+            self._runlog.finish(run_id, "COMPLETED", {"candidate_id": candidate.id, "verified": True, "reason": "execution result verified"})
             return RouteResult("ALLOW", candidate.id, value, "execution result verified", True, events, checkpoints)
 
         reason = "all eligible candidates were unavailable, quota-limited, warned, or failed with explicitly safe fallback errors"
         record("ROUTE_BLOCKED", reason=reason)
         checkpoint("ROUTE_BLOCKED", reason=reason)
+        self._runlog.finish(run_id, "BLOCKED", {"reason": reason})
         return RouteResult("BLOCKED", None, reason=reason, events=events, checkpoints=checkpoints)
 
     @staticmethod
