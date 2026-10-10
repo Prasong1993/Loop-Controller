@@ -1,8 +1,10 @@
 """Conservative public HTTPS source fetch and exact-quote verification."""
 from __future__ import annotations
 from html.parser import HTMLParser
+import http.client
 import ipaddress
 import socket
+import ssl
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
@@ -30,7 +32,7 @@ class _TextExtractor(HTMLParser):
     def handle_data(self, data):
         if not self.hidden: self.parts.append(data)
 
-def _validate_public_https_url(url:str)->str:
+def _validated_public_https_url(url:str):
     parsed=urlsplit(url)
     if parsed.scheme!="https" or not parsed.hostname or parsed.username or parsed.password:
         raise EvidenceFetchError("source URL must be an HTTPS URL without embedded credentials")
@@ -40,17 +42,46 @@ def _validate_public_https_url(url:str)->str:
     if host in {"localhost","localhost.localdomain"}:
         raise EvidenceFetchError("local hostnames are not allowed")
     try:
-        addresses={ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host,None)}
+        addresses=[]
+        for info in socket.getaddrinfo(host,443,type=socket.SOCK_STREAM):
+            address=ipaddress.ip_address(info[4][0])
+            if address not in addresses:
+                addresses.append(address)
     except (OSError,ValueError) as exc:
         raise EvidenceFetchError("source host could not be resolved") from exc
     if not addresses or any(not addr.is_global for addr in addresses):
         raise EvidenceFetchError("source host must resolve only to public IP addresses")
+    return parsed, host, [str(address) for address in addresses]
+
+def _validate_public_https_url(url:str)->str:
+    _validated_public_https_url(url)
     return url
 
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """Connect to a previously validated IP while retaining TLS hostname checks."""
+    def __init__(self, host, pinned_ip, **kwargs):
+        self._pinned_ip=pinned_ip
+        super().__init__(host, **kwargs)
+    def connect(self):
+        sock=socket.create_connection((self._pinned_ip,self.port),self.timeout,self.source_address)
+        self.sock=self._context.wrap_socket(sock,server_hostname=self.host)
+
+class _PinnedHTTPSHandler(HTTPSRedirectHandler):
+    def __init__(self, pinned_ip, context=None):
+        super().__init__()
+        self.pinned_ip=pinned_ip
+        self.context=context or ssl.create_default_context()
+    def https_open(self, req):
+        return self.do_open(lambda host, **kwargs: _PinnedHTTPSConnection(
+            host,self.pinned_ip,**kwargs),req,context=self.context)
+
 def fetch_public_text(url:str)->str:
-    safe_url=_validate_public_https_url(url)
+    parsed, host, addresses = _validated_public_https_url(url)
+    safe_url=url
     request=Request(safe_url,headers={"User-Agent":"NEXUS-EvidenceVerifier/0.1","Accept":"text/html,text/plain"})
-    opener=build_opener(_NoRedirect())
+    # Pin the connection to the address validated above to close the DNS
+    # validation/connection time-of-check-to-time-of-use gap.
+    opener=build_opener(_NoRedirect(),_PinnedHTTPSHandler(addresses[0]))
     try:
         with opener.open(request,timeout=TIMEOUT_SECONDS) as response:
             content_type=response.headers.get_content_type()
