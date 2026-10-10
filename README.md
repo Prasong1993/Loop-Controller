@@ -20,6 +20,9 @@ NEXUS เป็นชั้นควบคุม workflow สำหรับง�
 - [Risks and Open Issues](docs/RISKS_AND_OPEN_ISSUES.md)
 - [Evidence Register](evidence/EVIDENCE_REGISTER.md)
 - [Changelog](CHANGELOG.md)
+- [Architecture and connection map](docs/ARCHITECTURE_MAP.md)
+- [OpenAI capability matrix](docs/OPENAI_CAPABILITY_MATRIX.md)
+- [Anchor reference-only boundary](docs/ANCHOR_REFERENCE_BOUNDARIES.md)
 
 ## ข้อจำกัดสำคัญ
 เอกสารนี้ยังไม่ใช่หลักฐานว่ามี controller/runtime ที่ใช้งานจริงแล้ว ความสามารถในการควบคุม ChatGPT Android, connectors, background execution และการสลับผู้ให้บริการต้องตรวจจากเอกสารทางการและทดสอบจริงก่อนยืนยัน
@@ -38,7 +41,7 @@ Cross-platform scope includes Android, iOS, iPadOS, web and server-side orchestr
 - [Error report](docs/ERROR_REPORT.md)
 - [Evidence register](evidence/EVIDENCE_REGISTER.md)
 
-**Not production-ready:** CI/device test outcomes, authentication, production deployment, native mobile clients, evidence ingestion validation, and checkpoint restore are still open. Never expose the initial API publicly without security hardening.
+**Not production-ready:** code-level CI tests pass, but production identity/tenant isolation, secure deployment, adversarial network testing, concurrency/idempotency and ChatGPT account/mobile integration remain open. Trusted source-quote verification and additive task-scope migration are implemented and covered by tests; production security review is still required.
 
 
 ## Intended use and current integration status
@@ -54,11 +57,15 @@ NEXUS targets use through the ChatGPT application on Android, iOS and iPadOS via
 - [NASA-style checkpoint and action register](docs/CHECKPOINT_NEXUS_2026-10-10.md)
 - [Error and limitation report](docs/ERROR_REPORT.md)
 
-Recent code work adds a remote fail-closed bearer-token gate and guarded checkpoint restoration. These do not mean the API has been deployed or connected to ChatGPT; the live integration remains NOT CONFIGURED / NOT RUN.
+Recent code work adds OpenAI Responses API structured plans, allowlisted code-file proposals, read-only function tools, a deterministic capability registry, task-scoped evidence and searchable operational records. Code proposals are not written or executed by NEXUS. The shared bearer-token gate is only a prototype control. These changes do not mean the API has been deployed or connected to ChatGPT; live integration remains NOT CONFIGURED / NOT RUN.
 
 
 ## Controller adapters
 - MCP Streamable HTTP adapter: `nexus/mcp_server.py` (remote use requires secure HTTPS and configured `NEXUS_API_KEY`)
 - Source quote verifier: `nexus/evidence.py` (exact quote match; semantic claim review remains required)
 - OpenAPI contract: `openapi.yaml`
+- OpenAI code proposals: `POST /ai/code-proposal` (allowlisted file contents, double budget gate, proposal-only)
+- OpenAI structured planning: `POST /ai/plan` (proposal-only)
+- OpenAI read-only tool orchestration: `POST /ai/run` (NEXUS policy required before every registered handler)
+- Operational record search: `GET /records/search`
 - Integration contract and plan/account gate: [docs/CHATGPT_INTEGRATION_CONTRACT.md](docs/CHATGPT_INTEGRATION_CONTRACT.md)
