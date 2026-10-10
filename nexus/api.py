@@ -13,7 +13,7 @@ from nexus.records import RecordStore
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from nexus.core import NEXUS, PolicyDenied
-from nexus.evidence import EvidenceFetchError, verify_source_quote
+from nexus.evidence import EvidenceFetchError
 from nexus.openai_adapter import OpenAIResponsesWorker, OpenAIWorkerError
 from nexus.openai_planner import OpenAIPlanGenerator, OpenAIPlanError
 from nexus.version import VERSION
@@ -171,11 +171,10 @@ def add_evidence(body:EvidenceIn):
 @app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
 def verify_evidence(body:VerifyEvidenceIn):
     try:
-        proof=verify_source_quote(body.source_url,body.quoted_text)
+        return invoke(controller.verify_and_add_evidence,body.project_id,body.claim,body.source_url,
+                     body.quoted_text,body.notes,"api-source-verifier")
     except EvidenceFetchError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
-    return invoke(controller.add_verified_evidence,body.project_id,body.claim,body.source_url,
-                  proof["quoted_text"],proof["source_text"],body.notes,"api-source-verifier")
 @app.get("/projects/{project_id}/audit",dependencies=[Depends(require_api_key)])
 def audit(project_id:str,task_id:str|None=None): return invoke(controller.audit,project_id,task_id)
 
