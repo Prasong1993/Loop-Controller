@@ -256,7 +256,8 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         payload={k:v for k,v in event.items() if k not in {"prompt","arguments","output","api_key"}}
         try:
             record_store.append(project_id=body.project_id,record_type=record_type,
-                trace_id=trace_id,actor_type="system",component="openai_responses",
+                trace_id=trace_id,operation_id=payload.get("call_id") or payload.get("response_id"),
+                actor_type="system",component="openai_responses",
                 status=str(payload.get("decision",payload.get("outcome","RECORDED"))),
                 error_code=payload.get("error_code"),summary="OpenAI tool orchestration event",payload=payload)
         except Exception:
