@@ -39,11 +39,11 @@ Raise `ProviderError(code, message, fallback_safe=True)` only when the error is 
 
 ## Remaining verification
 
-- CI must run against the branch/PR.
+- CI status must be recorded from the actual branch/PR checks; do not infer it from earlier commits.
 - No real provider adapter or live quota endpoint is included in this change.
-- No API key or provider account has been called by these tests.
+- No API key or provider account is called by the mock-backed unit tests.
 - Durable router-stage checkpoints are wired to the existing SQLite controller and covered by a test that reads back checkpoint rows and audit events.
-- Production behavior, rate limits, and live fallback remain **UNKNOWN / NOT RUN** until exercised against an authorized provider integration.
+- Production behavior, rate limits, and live fallback remain **NOT_RUN / UNKNOWN** until exercised against an authorized provider integration. This does not block source review, static contract checks, mock-backed tests, or unrelated implementation work. Each skipped live check must be logged with a reason, and all runnable checks should continue.
 
 
 ## Automatic per-round execution logging
