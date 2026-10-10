@@ -23,13 +23,13 @@ class NexusCoreTests(unittest.TestCase):
     def test_execute_requires_acceptance_and_verification(self):
         t=self.n.create_task(self.project,"demo")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_evidence(self.project,"official fact","VERIFIED","https://example.com")
+        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"EXECUTE")
     def test_complete_requires_audited_result(self):
         t=self.n.create_task(self.project,"demo","expected","manual check")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_evidence(self.project,"official fact","VERIFIED","https://example.com")
+        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         self.n.transition(t["task_id"],"EXECUTE"); self.n.transition(t["task_id"],"VERIFY")
         self.n.transition(t["task_id"],"AUDIT")
@@ -68,7 +68,7 @@ class NexusCoreTests(unittest.TestCase):
     def test_checkpoint_restore_never_replays_execute_state(self):
         t=self.n.create_task(self.project,"unsafe restore","result","verify")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_evidence(self.project,"official fact","VERIFIED","https://example.com")
+        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
         self.n.transition(t["task_id"],"PLAN")
         self.n.transition(t["task_id"],"POLICY")
         self.n.transition(t["task_id"],"EXECUTE")
