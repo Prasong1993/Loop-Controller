@@ -46,13 +46,19 @@ class CodeProposalError(RuntimeError):
         self.code = code
 
 def _safe_relative_path(value: str) -> bool:
-    if not value or not value.strip() or "\\" in value or value.startswith("/"):
+    # Validate the raw spelling before PurePosixPath can normalize away "./"
+    # or repeated separators. This keeps the allowlist canonical and auditable.
+    if (not isinstance(value, str) or not value or value != value.strip()
+            or "\\" in value or value.startswith("/") or value.startswith("~")):
+        return False
+    raw_parts = value.split("/")
+    if any(part in {"", ".", ".."} or part != part.strip() for part in raw_parts):
         return False
     path = PurePosixPath(value)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+    if path.is_absolute() or path.as_posix() != value:
         return False
     forbidden = {".git", ".ssh", "secrets", "credentials", "node_modules"}
-    if any(part.casefold() in forbidden or part.casefold() == ".env" or part.casefold().startswith(".env.") for part in path.parts):
+    if any(part.casefold() in forbidden or part.casefold() == ".env" or part.casefold().startswith(".env.") for part in raw_parts):
         return False
     return True
 
