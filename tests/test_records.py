@@ -45,5 +45,23 @@ class RecordStoreTests(unittest.TestCase):
         self.store.append(project_id="p2", record_type="usage", payload={"operation":"b"})
         self.assertEqual(self.store.search(project_id="p1")["total"], 1)
 
+
+    def test_rejects_provider_keys_and_raw_content_recursively(self):
+        for payload in [
+            {"meta":{"OPENAI_API_KEY":"secret"}},
+            {"event":{"prompt":"user private prompt"}},
+            {"file_summary":[{"file_content":"source code"}]},
+            {"nested":{"tool_arguments":{"password":"secret"}}},
+        ]:
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    self.store.append(project_id="p1",record_type="usage",payload=payload)
+
+    def test_allows_redacted_token_counts_and_content_hashes(self):
+        record=self.store.append(project_id="p1",record_type="usage",
+            payload={"input_tokens":12,"output_tokens":8,
+                     "file_summary":[{"content_sha256":"abc123","content_chars":42}]})
+        self.assertEqual(record["status"],"RECORDED")
+
 if __name__ == "__main__":
     unittest.main()
