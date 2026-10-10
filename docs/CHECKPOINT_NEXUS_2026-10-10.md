@@ -147,3 +147,40 @@ Read-back verification completed for the following files after successful GitHub
 - `CHANGELOG.md` — scope correction recorded.
 
 **NEXUS-A001: COMPLETE (documentation change only).** This does not mean live ChatGPT integration is complete. NEXUS-A002 through A006 remain open/not configured as described above. The latest CI run recorded in this checkpoint remains run #12; confirm newer runs before relying on it for a release decision.
+
+
+## 12. Execution checkpoint update — 2026-10-10
+
+### Confirmed implementation since the previous checkpoint
+- **Safe checkpoint restore implemented** in `nexus/core.py` and exposed by the REST API. Restore is allowed only from BLOCKED/RECOVER; checkpoints captured at EXECUTE are denied to prevent accidental replay. Audit event `CHECKPOINT_RESTORED` is recorded.
+- **Remote API bearer gate implemented**: non-health endpoints require `NEXUS_API_KEY` when configured; remote requests fail closed if it is missing. Unknown IDs return 404, policy denials 403, invalid transitions 409. This is prototype authentication, not production OAuth/identity.
+- **Source quote verification implemented** in `nexus/evidence.py` and `POST /evidence/verify`; direct VERIFIED status through `POST /evidence` is denied. HTTPS-only fetch, no redirects, public-address check, 8-second timeout and 1 MB cap. Exact quote match proves quote presence only, not semantic support; high-impact claims need review.
+- **MCP adapter implemented** in `nexus/mcp_server.py` using the Python MCP SDK, with bounded project/task/checkpoint/evidence/audit/route tools and fail-closed bearer middleware.
+- **OpenAPI and integration contract added**: `openapi.yaml`, `docs/CHATGPT_INTEGRATION_CONTRACT.md`.
+- Added unit/API/evidence/MCP tests.
+
+### Latest confirmed CI
+- Run #53: **SUCCESS**, commit `4fa719ab1c678355cc0ff18894ec8c0519319c4d`: https://github.com/Prasong1993/Loop-Controller/actions/runs/38012564851
+- This run verifies the source at that commit. Later documentation commits may have newer runs; check latest status before release.
+
+### Open actions — revised status
+| Action | Revised status | Reason / next closure condition |
+|---|---|---|
+| NEXUS-A001 scope/documentation correction | COMPLETE | Files were written and read back |
+| NEXUS-A002 choose supported ChatGPT integration | **PARTIALLY VERIFIED / ACCOUNT BLOCKED** | Official OpenAI docs inspected: full MCP/write actions are rolling out in beta to Business/Enterprise/Edu and developer-mode setup is web/workspace controlled. Current reported user plan is Free; a supported workspace/account or a different available path is needed. Mobile-interface availability remains UNKNOWN until actual test. |
+| NEXUS-A003 integration contract | COMPLETE — draft contract | `openapi.yaml` and `docs/CHATGPT_INTEGRATION_CONTRACT.md` exist; auth mechanism needs final decision during deployment |
+| NEXUS-A004 secure deployment | BLOCKED | No selected/authorized runtime deployment; production identity, tenant isolation, SSRF review and secrets controls remain |
+| NEXUS-A005 register/configure ChatGPT app | BLOCKED | Requires supported plan/workspace, deployed HTTPS endpoint, and account-side setup |
+| NEXUS-A006 ChatGPT end-to-end acceptance | BLOCKED / NOT RUN | Cannot test a connector that is not configured |
+| NEXUS-A007 evidence verification | PARTIAL IMPLEMENTATION | Exact source quote is checked; semantic claim support and hardened SSRF/DNS rebinding review remain |
+| NEXUS-A008 checkpoint restore | IMPLEMENTED; CI PASS at run #53 | Restore gate and audit test passed; production crash/side-effect/idempotency stress tests remain |
+| NEXUS-A009 external provider execution adapters | OPEN | Router is still a selector; no external provider is executed |
+| NEXUS-A010 security/identity/tenant isolation | PARTIAL | Bearer gate implemented; production OAuth/identity, tenant/project authorization, rate limits and redacted logs remain |
+| NEXUS-A011 backup/migration/rollback | OPEN | No tested backup/restore, schema migration or operational rollback rehearsal |
+| NEXUS-A012 repository rename | OPTIONAL | Does not block product implementation |
+
+### Important platform finding
+OpenAI's official documentation checked on 2026-10-10 says full MCP support including write/modify actions is rolling out in beta to Business, Enterprise and Edu, and developer-mode setup is managed through web/workspace settings. It does not establish that the current Free account can register a custom MCP app or that the app is available in the mobile interface. Do not claim otherwise.
+
+### Resume instruction
+The code-side increments above are implemented and CI-tested at the commit listed. Do not loop back to the completed documentation task. Continue with hardening and adapter tests; live ChatGPT registration remains blocked by account/workspace and deployment prerequisites, not by a missing checklist.
