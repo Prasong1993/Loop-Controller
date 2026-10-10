@@ -18,6 +18,7 @@ from nexus.core import NEXUS, PolicyDenied
 from nexus.records import RecordStore
 from nexus.evidence import EvidenceFetchError
 from nexus.version import VERSION
+from nexus.mcp_extensions import load_mcp_extensions
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
@@ -154,6 +155,9 @@ def nexus_search_records(project_id:str,record_type:str|None=None,task_id:str|No
 def nexus_select_route(candidates:list[dict],allow_paid:bool=False,budget_approved:bool=False)->dict:
     """Select an eligible route; does not execute a provider. Paid routes need both approvals."""
     return controller.policy_route(candidates,allow_paid,budget_approved)
+
+# Optional server-admin configured extensions; loaded at startup and audited like built-in tools.
+load_mcp_extensions(mcp, track_tool)
 
 class BearerGateMiddleware:
     """Fail-closed bearer gate; production should replace shared token with reviewed OAuth/identity."""

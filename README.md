@@ -62,6 +62,9 @@ NEXUS targets use through the ChatGPT application on Android, iOS and iPadOS via
 Recent code work adds OpenAI Responses API structured plans, allowlisted code-file proposals, read-only function tools, a deterministic capability registry, task-scoped evidence and searchable operational records. Code proposals are not written or executed by NEXUS. The shared bearer-token gate is only a prototype control. These changes do not mean the API has been deployed or connected to ChatGPT; live integration remains NOT CONFIGURED / NOT RUN.
 
 
+## Scalable MCP extensions
+- Extension registry and configuration: `docs/MCP_EXTENSIBILITY.md`
+
 ## Controller adapters
 - MCP Streamable HTTP adapter: `nexus/mcp_server.py` (remote use requires secure HTTPS and configured `NEXUS_API_KEY`)
 - Source quote verifier: `nexus/evidence.py` (exact quote match; semantic claim review remains required)
