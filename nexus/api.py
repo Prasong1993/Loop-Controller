@@ -271,7 +271,7 @@ def propose_code(body:AICodeProposalIn,request:Request):
             allowed_paths=body.allowed_paths,task_id=body.task_id,constraints=body.constraints,
             budget_approved=body.budget_approved and budget_gate,trace_id=trace_id)
     except CodeProposalError as exc:
-        code=403 if exc.code=="OPENAI_BUDGET_APPROVAL_REQUIRED" else 503 if exc.code in {"OPENAI_API_KEY_MISSING","OPENAI_SDK_MISSING"} else 502
+        code=403 if exc.code in {"OPENAI_BUDGET_APPROVAL_REQUIRED","CODE_PATH_NOT_ALLOWED","DUPLICATE_CODE_PATH"} else 503 if exc.code in {"OPENAI_API_KEY_MISSING","OPENAI_SDK_MISSING"} else 502
         raise HTTPException(status_code=code,detail={"code":exc.code,"message":str(exc)}) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
