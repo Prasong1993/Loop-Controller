@@ -62,6 +62,10 @@ def track_tool(fn):
                     scoped_project=task_row["project_id"]
                 if scoped_project and not project_authorization.has_access(scoped_project,principal):
                     raise PolicyDenied("principal is not a member of this project")
+                read_only_tools={"nexus_health","nexus_get_task","nexus_get_task_dependencies",
+                    "nexus_get_project_status","nexus_read_audit","nexus_search_records","nexus_select_route"}
+                if scoped_project and fn.__name__ not in read_only_tools and not project_authorization.can_write(scoped_project,principal):
+                    raise PolicyDenied("project membership is read-only")
             result=fn(*args,**kwargs)
             if fn.__name__=="nexus_create_project":
                 project_authorization.grant_owner(result["project_id"],principal or "legacy-shared")
@@ -139,6 +143,18 @@ def nexus_get_project_status(project_id:str)->dict:
 def nexus_transition_task(task_id:str,to_state:str,actor:str="chatgpt",reason:str="",result:str|None=None,error_code:str|None=None)->dict:
     """Request a policy-gated state transition. Policy denials must not be retried blindly."""
     return controller.transition(task_id,to_state,actor,reason,result,error_code)
+
+@mcp.tool()
+@track_tool
+def nexus_record_verification(task_id:str,verifier:str,evidence_id:str,result_sha256:str="",notes:str="")->dict:
+    """Persist a passing verification while the task is in VERIFY; COMPLETE requires read-back proof."""
+    return controller.record_verification(task_id,verifier,evidence_id,result_sha256,notes)
+
+@mcp.tool()
+@track_tool
+def nexus_get_verifications(task_id:str)->list[dict]:
+    """Read back persisted verification records for a task."""
+    return controller.get_verifications(task_id)
 
 @mcp.tool()
 @track_tool
