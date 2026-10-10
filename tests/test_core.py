@@ -59,6 +59,13 @@ class NexusCoreTests(unittest.TestCase):
     def test_invalid_transition_denied(self):
         t=self.n.create_task(self.project,"demo")
         with self.assertRaises(InvalidTransition): self.n.transition(t["task_id"],"COMPLETE")
+
+    def test_recovery_cannot_skip_directly_to_execute(self):
+        t=self.n.create_task(self.project,"recovery gate","expected result","manual verification")
+        self.n.transition(t["task_id"],"BLOCKED",reason="simulate interruption")
+        self.n.transition(t["task_id"],"RECOVER",reason="begin recovery")
+        with self.assertRaises(InvalidTransition):
+            self.n.transition(t["task_id"],"EXECUTE",reason="must replan and pass policy first")
     def test_execute_requires_acceptance_and_verification(self):
         t=self.n.create_task(self.project,"demo")
         self.n.transition(t["task_id"],"RESEARCH")
