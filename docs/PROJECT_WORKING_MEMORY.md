@@ -264,3 +264,41 @@ Every stage must produce a structured handoff containing:
 - [ ] The final output can trace key conclusions and actions through the stages to source evidence.
 - [ ] NASA-specific claims about the reference model remain unverified until supported by authoritative NASA documentation.
 
+## 16. Conversation continuity and current project checkpoint
+
+**Checkpoint date:** 2026-10-10  
+**Purpose:** Ensure a new conversation resumes from the verified project state instead of asking the user to repeat the background or silently restarting the work.
+
+### User's clarification and working agreement
+
+- The user is **not** using NASA as a cited authority or as a component/brand of the system being built. The user invokes NASA-style engineering discipline as an instruction for how the assistant should work: preserve context, maintain stage continuity, trace decisions to evidence, apply review/gates, and prevent omissions across long conversations.
+- The system's central purpose is continuity and consistency across linked work stages, using evidence and explicit handoffs. Do not conflate this with projects that merge operating systems or unify unrelated system capabilities.
+- The assistant must retrieve this project's latest Working Memory and relevant project artifacts at the start of substantial follow-up work, report the current position and next permitted step, and continue from there. Do not make the user restate settled requirements unless an essential unresolved decision truly needs their input.
+- Do not report plans as completed work. Record the exact step reached, deliverables completed, evidence used, checks actually run, unresolved questions/blockers, and the next action. On a new conversation, first read this checkpoint and then refresh the live repository/PR/CI state before claiming it is current.
+- Preserve project separation. Do not import unrelated project records or evidence into this repository merely because a search result contains similar terms. Label recovered context separately from live-verified repository facts.
+
+### Verified progress at this checkpoint
+
+- The current repository branch for this work is `feature/tr-req-001-tool-router`.
+- Section 14 records the user's work-lane review, whole-system compatibility review, and resource-aware final-CI workflow.
+- Section 15 records the user's staged evidence workflow and project evidence repository requirements.
+- In this session, the assistant fetched the Working Memory from the named branch and read back Sections 14–15. This confirms those process requirements are present in the retrieved file; it does **not** prove that the required runtime features have been implemented.
+- No code implementation, test suite, CI run, deployment, or external evidence study was executed as part of this conversation checkpoint. Do not count this conversation as a code/test completion.
+- Previously recorded repository context says PR #3 is open and must not be merged without explicit user approval. Refresh the live PR state before relying on this in a future session.
+
+### Current work position and next action
+
+- **Completed in the project record:** documented the operating agreement for parallel work-lane review/CI (Section 14) and the multi-stage evidence-first handoff model (Section 15).
+- **Current position:** process requirements are recorded; implementation progress and the exact unfinished starting-stage deliverable have not been revalidated in this checkpoint. Overall project completion percentage is therefore **UNKNOWN** and must not be guessed.
+- **Next action:** refresh the live branch, open PR, changed files, latest CI status, and current implementation evidence; compare them against the approved roadmap/acceptance criteria; then record a concrete stage-by-stage progress table with VERIFIED / COMPLETED / FAILED / BLOCKED / NOT_RUN / UNKNOWN / RECOVERED statuses and select the next allowed work unit.
+- Do not start unrelated implementation or claim the project is complete until that reconciliation is done. Do not merge PR #3 without explicit user approval.
+
+### Required opening protocol for future conversations
+
+1. Identify the active project and branch from this file; avoid mixing other projects.
+2. Read this checkpoint and the relevant current source-of-truth artifacts.
+3. Refresh live repository, PR, and CI evidence if available.
+4. Tell the user briefly: current stage, what is verified complete, what remains, blockers, and the next action.
+5. Update this checkpoint after material progress, including revision/commit, work completed, tests/checks actually run, outcomes, and next step.
+6. At final delivery, read the saved record back and confirm the recorded state matches the actual artifact/revision.
+
