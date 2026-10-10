@@ -10,6 +10,7 @@ import json
 import time
 import uuid
 from nexus.records import RecordStore
+from nexus.idempotency import IdempotencyStore, IdempotencyConflict, IdempotencyInProgress
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from nexus.core import NEXUS, PolicyDenied
@@ -23,6 +24,7 @@ app=FastAPI(title="NEXUS Controller API",version=VERSION,
  description="Evidence-first deterministic workflow controller")
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+idempotency_store=IdempotencyStore(os.getenv("NEXUS_IDEMPOTENCY_DB",os.getenv("NEXUS_DB","data/nexus.db")))
 plan_generator=OpenAIPlanGenerator(record_store)
 code_proposal_generator=OpenAICodeProposalGenerator(record_store)
 
@@ -135,6 +137,16 @@ class TransitionIn(BaseModel):
     reason:str=""
     result:str|None=None
     error_code:str|None=None
+class VerificationIn(BaseModel):
+    evidence_id:str=Field(min_length=1,max_length=200)
+    verifier:str=Field(min_length=1,max_length=200)
+    result_sha256:str=""
+    notes:str=""
+    @field_validator("evidence_id","verifier")
+    @classmethod
+    def nonblank_verification_values(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 class RouteIn(BaseModel):
     candidates:list[dict]
     allow_paid:bool=False
@@ -238,8 +250,47 @@ def get_task_dependencies(task_id:str,request:Request):
     request.state.task_id=task_id
     return invoke(controller.get_task_dependencies,task_id)
 @app.post("/tasks/{task_id}/transition",dependencies=[Depends(require_api_key)])
-def transition(task_id:str,body:TransitionIn):
+def transition(task_id:str,body:TransitionIn,request:Request,idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
+    task=invoke(controller.get_task,task_id)
+    request.state.project_id=task["project_id"]
+    request.state.task_id=task_id
+    if body.to_state=="EXECUTE":
+        if not idempotency_key or not idempotency_key.strip():
+            raise HTTPException(status_code=428,detail={"code":"IDEMPOTENCY_KEY_REQUIRED",
+                "message":"Idempotency-Key is required before entering EXECUTE."})
+        fingerprint=json.dumps({"task_id":task_id,"to_state":body.to_state,"actor":body.actor,
+            "reason":body.reason,"result":body.result,"error_code":body.error_code},sort_keys=True,separators=(",",":"))
+        try:
+            existing=idempotency_store.claim(idempotency_key.strip(),scope=f"task:{task_id}:transition",fingerprint=fingerprint)
+            if existing["status"]=="COMPLETED":
+                return existing["response"]
+            response=invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
+            idempotency_store.complete(idempotency_key.strip(),response)
+            return response
+        except IdempotencyConflict as exc:
+            raise HTTPException(status_code=409,detail={"code":"IDEMPOTENCY_KEY_CONFLICT","message":str(exc)}) from exc
+        except IdempotencyInProgress as exc:
+            raise HTTPException(status_code=409,detail={"code":"IDEMPOTENCY_OUTCOME_UNKNOWN","message":str(exc)}) from exc
+        except Exception as exc:
+            try: idempotency_store.mark_uncertain(idempotency_key.strip(),type(exc).__name__)
+            except Exception as ledger_exc:
+                raise HTTPException(status_code=503,detail={"code":"IDEMPOTENCY_LEDGER_UNAVAILABLE","message":"Could not persist execution outcome; stop and reconcile before retry."}) from ledger_exc
+            raise
     return invoke(controller.transition,task_id,body.to_state,body.actor,body.reason,body.result,body.error_code)
+
+@app.post("/tasks/{task_id}/verification",dependencies=[Depends(require_api_key)])
+def record_task_verification(task_id:str,body:VerificationIn,request:Request):
+    task=invoke(controller.get_task,task_id)
+    request.state.project_id=task["project_id"]
+    request.state.task_id=task_id
+    return invoke(controller.record_verification,task_id,body.verifier,body.evidence_id,body.result_sha256,body.notes)
+
+@app.get("/tasks/{task_id}/verification",dependencies=[Depends(require_api_key)])
+def get_task_verifications(task_id:str,request:Request):
+    task=invoke(controller.get_task,task_id)
+    request.state.project_id=task["project_id"]
+    request.state.task_id=task_id
+    return invoke(controller.get_verifications,task_id)
 @app.post("/tasks/{task_id}/checkpoint",dependencies=[Depends(require_api_key)])
 def checkpoint(task_id:str): return invoke(controller.checkpoint,task_id)
 @app.post("/tasks/{task_id}/restore",dependencies=[Depends(require_api_key)])
