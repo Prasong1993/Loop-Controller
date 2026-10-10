@@ -16,6 +16,7 @@ from nexus.core import NEXUS, PolicyDenied
 from nexus.evidence import EvidenceFetchError
 from nexus.openai_adapter import OpenAIResponsesWorker, OpenAIWorkerError
 from nexus.openai_planner import OpenAIPlanGenerator, OpenAIPlanError
+from nexus.code_proposal import OpenAICodeProposalGenerator, CodeProposalError
 from nexus.version import VERSION
 
 app=FastAPI(title="NEXUS Controller API",version=VERSION,
@@ -23,6 +24,7 @@ app=FastAPI(title="NEXUS Controller API",version=VERSION,
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
 plan_generator=OpenAIPlanGenerator(record_store)
+code_proposal_generator=OpenAICodeProposalGenerator(record_store)
 
 @app.middleware("http")
 async def operational_record_middleware(request: Request, call_next):
@@ -154,6 +156,18 @@ class AIRunIn(BaseModel):
     def nonblank_run_fields(cls,value):
         if not value.strip(): raise ValueError("field must not be blank")
         return value.strip()
+class AICodeProposalIn(BaseModel):
+    project_id:str=Field(min_length=1,max_length=200)
+    task_id:str|None=None
+    task:str=Field(min_length=1,max_length=20000)
+    allowed_paths:list[str]=Field(min_length=1,max_length=20)
+    constraints:list[str]=Field(default_factory=list,max_length=100)
+    budget_approved:bool=False
+    @field_validator("project_id","task")
+    @classmethod
+    def nonblank_code_fields(cls,value):
+        if not value.strip(): raise ValueError("field must not be blank")
+        return value.strip()
 
 def require_api_key(request:Request, authorization:str|None=Header(default=None)):
     expected=os.getenv("NEXUS_API_KEY","").strip()
@@ -235,6 +249,28 @@ def propose_ai_plan(body:AIPlanIn,request:Request):
             constraints=body.constraints,capabilities=body.capabilities,
             budget_approved=body.budget_approved and budget_gate,trace_id=trace_id)
     except OpenAIPlanError as exc:
+        code=403 if exc.code=="OPENAI_BUDGET_APPROVAL_REQUIRED" else 503 if exc.code in {"OPENAI_API_KEY_MISSING","OPENAI_SDK_MISSING"} else 502
+        raise HTTPException(status_code=code,detail={"code":exc.code,"message":str(exc)}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@app.post("/ai/code-proposal",dependencies=[Depends(require_api_key)])
+def propose_code(body:AICodeProposalIn,request:Request):
+    budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
+    trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
+    # Validate project/task scope before a paid provider call.
+    invoke(controller.status,body.project_id)
+    if body.task_id:
+        task_row=invoke(controller.get_task,body.task_id)
+        if task_row["project_id"] != body.project_id:
+            raise HTTPException(status_code=403,detail={"code":"PROJECT_SCOPE_MISMATCH",
+                "message":"task_id does not belong to project_id"})
+    try:
+        return code_proposal_generator.propose(project_id=body.project_id,task=body.task,
+            allowed_paths=body.allowed_paths,task_id=body.task_id,constraints=body.constraints,
+            budget_approved=body.budget_approved and budget_gate,trace_id=trace_id)
+    except CodeProposalError as exc:
         code=403 if exc.code=="OPENAI_BUDGET_APPROVAL_REQUIRED" else 503 if exc.code in {"OPENAI_API_KEY_MISSING","OPENAI_SDK_MISSING"} else 502
         raise HTTPException(status_code=code,detail={"code":exc.code,"message":str(exc)}) from exc
     except ValueError as exc:
