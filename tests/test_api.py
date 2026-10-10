@@ -46,7 +46,7 @@ class NexusApiTests(unittest.TestCase):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
             project = self.client.post("/projects", json={"name":"evidence-verify"},
                                        headers={"Authorization":"Bearer test-secret"}).json()
-            with patch("nexus.api.verify_source_quote", return_value={
+            with patch("nexus.evidence.verify_source_quote", return_value={
                 "source_text":"Exact policy quote appears here.","quoted_text":"Exact policy quote",
                 "source_chars":32,"method":"exact normalized quote match","source_url":"https://example.com"}):
                 response = self.client.post("/evidence/verify", json={"project_id":project["project_id"],
