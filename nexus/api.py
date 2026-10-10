@@ -260,7 +260,7 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         except Exception:
             pass
     try:
-        worker=OpenAIResponsesWorker(model=os.getenv("NEXUS_OPENAI_MODEL","gpt-4.1-mini"))
+        worker=OpenAIResponsesWorker(model=os.getenv("NEXUS_OPENAI_MODEL","gpt-6-luna"))
         result=worker.run(prompt=body.prompt,tools=_AI_READ_TOOLS,tool_handlers=handlers,
                           policy_check=policy_check,record=record)
         result.update({"project_id":body.project_id,"trace_id":trace_id,
