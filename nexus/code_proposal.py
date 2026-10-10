@@ -13,6 +13,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from nexus.records import RecordStore
 
+SUPPORTED_CODE_MODELS = {"gpt-6-astra", "gpt-6.1-sol"}
+
 CODE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -79,6 +81,8 @@ class OpenAICodeProposalGenerator:
             raise ValueError("project_id and task are required")
         if len(task) > 20000:
             raise ValueError("task must be at most 20000 characters")
+        if self.model not in SUPPORTED_CODE_MODELS:
+            raise ValueError(f"code generation is not verified for model {self.model}")
         if not allowed_paths or len(allowed_paths) > 20:
             raise ValueError("allowed_paths must contain 1..20 paths")
         if len(set(allowed_paths)) != len(allowed_paths) or any(not _safe_relative_path(path) for path in allowed_paths):
@@ -118,8 +122,12 @@ class OpenAICodeProposalGenerator:
             for item in files:
                 path = item.get("path", "")
                 if path not in allowed_paths or not _safe_relative_path(path):
+                    self._record(project_id, task_id, trace_id, operation_id, "decision", "BLOCK",
+                                 "CODE_PATH_NOT_ALLOWED", {"proposed_path_sha256": hashlib.sha256(str(path).encode("utf-8")).hexdigest()})
                     raise CodeProposalError("CODE_PATH_NOT_ALLOWED", "Provider proposed a path outside the explicit allowlist.")
                 if path in seen:
+                    self._record(project_id, task_id, trace_id, operation_id, "decision", "BLOCK",
+                                 "DUPLICATE_CODE_PATH", {"proposed_path_sha256": hashlib.sha256(str(path).encode("utf-8")).hexdigest()})
                     raise CodeProposalError("DUPLICATE_CODE_PATH", "Provider proposed the same path more than once.")
                 seen.add(path)
             usage = {}
