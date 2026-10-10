@@ -26,3 +26,16 @@ NEXUS เป็นชั้นควบคุม workflow สำหรับง�
 
 ## การเปลี่ยนแปลง
 บันทึกเหตุผล แหล่งหลักฐาน ผลกระทบ และการทดสอบสำหรับการเปลี่ยนแปลงที่สำคัญ ห้ามนำข้อมูลจากโครงการอื่นมาเป็นข้อเท็จจริงของ NEXUS โดยอัตโนมัติ
+
+## NEXUS controller implementation status
+Cross-platform scope includes Android, iOS, iPadOS, web and server-side orchestration. The initial deterministic Python/SQLite controller and optional FastAPI API are under `nexus/`; tests are under `tests/`; CI is configured in `.github/workflows/ci.yml`.
+
+- [System Design Reference Document](docs/NEXUS_SDRD_v1.0_TH.md)
+- [Platform compatibility matrix](docs/PLATFORM_COMPATIBILITY.md)
+- [Implementation guide](docs/IMPLEMENTATION.md)
+- [Requirements](docs/REQUIREMENTS.md)
+- [Verification plan](docs/VERIFICATION_PLAN.md)
+- [Error report](docs/ERROR_REPORT.md)
+- [Evidence register](evidence/EVIDENCE_REGISTER.md)
+
+**Not production-ready:** CI/device test outcomes, authentication, production deployment, native mobile clients, evidence ingestion validation, and checkpoint restore are still open. Never expose the initial API publicly without security hardening.
