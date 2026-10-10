@@ -4,7 +4,7 @@ Updated: 2026-10-11
 Scope: repository evidence and implementation tracking for this repository only.
 Baseline: `main` at `eb5359505bf39e4ca1dcd3512f2b8ea3ac6e8baa`.
 Work branch: `work/project-control-api-hardening-2026-10-11`.
-This register distinguishes source inspection from executed tests and live integration. A source file existing does not prove its feature is complete. Latest fully confirmed work-branch verification before task-dependency changes: CI run #252 passed on Python 3.11, 3.12 and 3.13. Task dependency implementation and tests are now on the branch; their final CI result is pending.
+This register distinguishes source inspection from executed tests and live integration. A source file existing does not prove its feature is complete. Latest work-branch verification: CI run #262 passed on Python 3.11, 3.12 and 3.13 for commit `17eddd28d6ca87b04dd4697b829ddf5787e2302c`; each matrix job passed 4 OpenAPI contract tests and 97 unit tests.
 
 ## Evidence states
 
@@ -19,9 +19,9 @@ This register distinguishes source inspection from executed tests and live integ
 
 | Requirement | Source / module | Test case(s) | Current evidence / remaining work |
 |---|---|---|---|
-| Project and task identity/state | `nexus/core.py`, `nexus/api.py` | `tests/test_core.py`, `tests/test_api.py` | PASS-CI on prior branch increment; task-dependency extensions added afterward and await final CI |
+| Project and task identity/state | `nexus/core.py`, `nexus/api.py` | `tests/test_core.py`, `tests/test_api.py` | PASS-CI run #262; task dependency tests also passed |
 | Legal state transitions and evidence gate | `nexus/core.py` | `tests/test_core.py` | PASS-CI on work branch: direct `RECOVER → EXECUTE` is rejected; recovery must return through planning/policy. Run #244 |
-| Task dependencies and DAG safety | `nexus/core.py`, `nexus/api.py`, `nexus/mcp_server.py`, `openapi.yaml` | `tests/test_core.py`, `tests/test_api.py`, `tests/test_openapi_contract.py` | Implementation added: same-project dependencies, cycle/duplicate rejection, pre-policy editing restriction, and EXECUTE blocked until dependencies are COMPLETE; final CI pending |
+| Task dependencies and DAG safety | `nexus/core.py`, `nexus/api.py`, `nexus/mcp_server.py`, `openapi.yaml` | `tests/test_core.py`, `tests/test_api.py`, `tests/test_openapi_contract.py` | PASS-CI run #262: same-project dependencies, cycle/duplicate rejection, pre-policy editing restriction, and EXECUTE blocked until dependencies are COMPLETE |
 | Evidence ingestion and source quote | `nexus/evidence.py`, `nexus/core.py` | `tests/test_evidence.py`, `tests/test_core.py` | PARTIAL: exact quote presence is not semantic claim support |
 | Deterministic policy / permission gate | `nexus/core.py`, `nexus/capabilities.py`, `nexus/openai_adapter.py` | `tests/test_core.py`, `tests/test_capabilities.py`, `tests/test_openai_adapter.py` | VERIFIED-SOURCE; policy isolation/security review remains |
 | Tool routing and Free-first | `nexus/router.py`, `nexus/runlog.py`, `nexus/core.py` | `tests/test_router.py`, `tests/test_core.py` | IMPLEMENTED ON WORK BRANCH; PASS-CI run #249: free-first, explicit budget approvals, quota preflight, safe fallback classification, verification stop, durable run events and checkpoints. No live provider adapter is configured |
