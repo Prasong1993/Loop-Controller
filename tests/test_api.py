@@ -61,6 +61,25 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+    def test_task_dependencies_rest_round_trip(self):
+        headers={"Authorization":"Bearer test-secret"}
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            project=self.client.post("/projects",json={"name":"dependency-api-test"},headers=headers)
+            self.assertEqual(project.status_code,201)
+            project_id=project.json()["project_id"]
+            prerequisite=self.client.post("/tasks",json={"project_id":project_id,"title":"prerequisite"},headers=headers)
+            dependent=self.client.post("/tasks",json={"project_id":project_id,"title":"dependent"},headers=headers)
+            self.assertEqual(prerequisite.status_code,201)
+            self.assertEqual(dependent.status_code,201)
+            added=self.client.post(f"/tasks/{dependent.json()['task_id']}/dependencies",
+                json={"depends_on_task_id":prerequisite.json()["task_id"]},headers=headers)
+            listed=self.client.get(f"/tasks/{dependent.json()['task_id']}/dependencies",headers=headers)
+        self.assertEqual(added.status_code,201,added.text)
+        self.assertEqual(added.json()["depends_on_task_id"],prerequisite.json()["task_id"])
+        self.assertEqual(listed.status_code,200,listed.text)
+        self.assertEqual(len(listed.json()),1)
+        self.assertEqual(listed.json()[0]["state"],"INTAKE")
+
     def test_ai_plan_is_blocked_without_explicit_paid_budget_approval(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
             response=self.client.post("/ai/plan",json={"project_id":"p-test","task":"draft a plan","budget_approved":True},
