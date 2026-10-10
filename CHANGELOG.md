@@ -70,3 +70,11 @@
 - CI run #249 passed on Python 3.11, 3.12 and 3.13 (4 OpenAPI contract tests and 94 unit tests per matrix job): https://github.com/Prasong1993/Loop-Controller/actions/runs/38076731270
 - This is not a production-readiness claim: live provider adapters, durable idempotency for arbitrary side effects, production identity/tenant isolation, rate limiting, secured HTTPS deployment, and Plugin Creator round-trip remain open / NOT RUN.
 - All changes remain on `work/project-control-api-hardening-2026-10-11`; no existing PR was merged or modified.
+
+
+## 2026-10-11 — Task dependency controls
+- Added additive SQLite `task_dependencies` schema and deterministic dependency management in the controller.
+- Dependencies are restricted to tasks in the same project; self-links, cycles, duplicates and changes after the policy gate are rejected.
+- `EXECUTE` is blocked until every declared dependency is `COMPLETE`.
+- Added REST and MCP dependency operations, documented both REST operations in `openapi.yaml`, and added core/API/contract regression tests.
+- Final CI for this increment is pending; do not mark these new changes PASS until a run for the resulting commit completes.
