@@ -38,3 +38,16 @@ Paid candidates require allow_paid=true and budget_approved=true. Candidates wit
 
 ## Production gaps
 See ERROR_REPORT.md. Before production: authentication/authorization, tenant isolation, migrations, verified evidence ingestion, checkpoint restoration, rate limiting, secret management, structured redacted logging, idempotency keys, backup/restore, deployment configuration and platform-specific clients/adapters.
+
+
+## Intended ChatGPT-app integration
+
+NEXUS is intended to be accessed through the ChatGPT application on Android, iOS and iPadOS using a connected app/tool/API integration supported by the target account and interface. A separate native NEXUS mobile app is not required.
+
+**Current status: NOT CONFIGURED / NOT RUN.** The FastAPI API in this repository is source/local runtime only; it has not been securely deployed or connected to the user's ChatGPT account. Do not claim live integration until an actual end-to-end round-trip passes.
+
+Acceptance must cover integration discoverability, least-privilege authorization, create/read task, policy denial, audit readback and warning/timeout handling. Physical-device tests are conditional and apply only when native or OS-specific features are introduced.
+
+## Production gaps
+
+Authentication/authorization, tenant isolation, migrations, verified evidence ingestion, checkpoint restoration, rate limiting, secret management, redacted logging, idempotency, backup/restore, secure deployment and the supported ChatGPT integration adapter remain open. Do not expose the initial API publicly.
