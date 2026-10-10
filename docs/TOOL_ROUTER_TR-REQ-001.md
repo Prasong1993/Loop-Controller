@@ -44,3 +44,10 @@ Raise `ProviderError(code, message, fallback_safe=True)` only when the error is 
 - No API key or provider account has been called by these tests.
 - Durable router-stage checkpoints are wired to the existing SQLite controller and covered by a test that reads back checkpoint rows and audit events.
 - Production behavior, rate limits, and live fallback remain **UNKNOWN / NOT RUN** until exercised against an authorized provider integration.
+
+
+## Automatic per-round execution logging
+
+Every invocation now creates one row in SQLite `router_runs` and an ordered, append-only event history in `router_run_events`. Route decisions, errors, and durable checkpoint writes are recorded automatically. A successful route is marked `COMPLETED`; a blocked route is marked `BLOCKED`. If execution is interrupted before a terminal event, the run remains `RUNNING` so it is visibly incomplete and can be investigated rather than being reported as successful.
+
+The run ledger shares the NEXUS database configured by the controller. The test suite checks that a full routing round writes a start event, route events, checkpoint events, a terminal status, and a persisted outcome. This is runtime execution history; Git commits remain the version history for source-code changes, not a place to append private task payloads every round.
