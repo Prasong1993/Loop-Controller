@@ -51,3 +51,23 @@ This register distinguishes source inspection from executed tests and live integ
 3. Wire only explicitly registered server-side adapters to a runtime entry point; never accept executable adapter code from API input.
 4. Keep PR #1–#3 unchanged; these changes are isolated on the work branch and do not change `main`.
 5. Require secured HTTPS endpoint, actual account/plugin configuration, and real round-trip evidence before marking live integration PASS.
+
+
+## 2026-10-11 — Authorization, idempotency and completion verification follow-up
+
+Latest verified code baseline before this documentation update: `f55f07aabad2dd2b8769017517ec2d8b7c7d1445`. GitHub Actions run [#281](https://github.com/Prasong1993/Loop-Controller/actions/runs/38079224483) passed Compile, OpenAPI contract validation and unit tests on Python 3.11, 3.12 and 3.13.
+
+| Requirement | Source / tests | Status | Evidence / remaining gap |
+|---|---|---|---|
+| Project membership and tenant isolation | `nexus/authorization.py`, `nexus/api.py`, `nexus/mcp_server.py`; `tests/test_api.py::test_project_level_authorization_denies_cross_tenant_reads_and_writes`, `tests/test_mcp_server.py::test_mcp_project_access_denies_cross_tenant_principal` | **VERIFIED-TESTED / PARTIAL** | REST and MCP support configured `NEXUS_API_TOKENS` principal mapping and persisted project membership. The legacy single `NEXUS_API_KEY` maps all holders to the same principal and is not a multi-tenant identity system. Membership provisioning is not yet an authenticated admin API. |
+| Read-only project role | `nexus/authorization.py`, `nexus/api.py`, `nexus/mcp_server.py` | **PARTIAL** | OWNER/MEMBER may write; READ_ONLY may read. Dedicated negative tests for read-only write denial remain to be added. |
+| Durable idempotency | `nexus/idempotency.py`, `nexus/api.py`, `tests/test_idempotency.py`, `tests/test_api.py` | **PARTIAL** | The REST transition to EXECUTE requires an Idempotency-Key. Completed responses are replayed from storage; mismatched keys conflict; IN_PROGRESS/UNCERTAIN records block automatic replay after timeout/crash. This is not a generalized idempotency contract for arbitrary external side effects, and there is no automated reconciliation workflow. |
+| Independent verification before COMPLETE | `nexus/core.py`, `nexus/api.py`, `nexus/mcp_server.py`; `tests/test_core.py`, `tests/test_api.py` | **PARTIAL** | COMPLETE now requires a persisted passing verification joined back to VERIFIED project/task-scoped evidence. The verifier must be a distinct authenticated principal from the recorded EXECUTE actor. Semantic claim support, trusted verifier provisioning, and a required result digest still need stronger assurance. |
+| Rate limiting | `nexus/api.py`, `nexus/mcp_server.py`; `tests/test_api.py::test_rate_limit_returns_429_after_configured_budget` | **VERIFIED-TESTED / PARTIAL** | Configurable per-process, per-client-IP limiter returns 429. It is not distributed across multiple workers/replicas and is not a production-grade abuse-control boundary. |
+| Mandatory audit fail-closed | `nexus/api.py`, `nexus/mcp_server.py`; `tests/test_api.py::test_mandatory_start_audit_failure_stops_before_project_creation`, router checkpoint-failure test | **PARTIAL** | REST request-start and MCP tool-start records must persist before business/tool execution; failure stops the request. Some completion/error outcome records remain best-effort and swallowed, so mandatory end-to-end audit is not yet VERIFIED. |
+| Timeout/crash/partial side-effect recovery | `nexus/idempotency.py`, `nexus/core.py`, `nexus/router.py`; `tests/test_idempotency.py`, `tests/test_router.py` | **PARTIAL** | A crash-like abandoned claim remains blocked from replay. Real provider/tool partial-side-effect fault injection and operator reconciliation are NOT RUN. |
+| Live Plugin Creator integration | `docs/CHATGPT_INTEGRATION_CONTRACT.md`, `openapi.yaml`, `nexus/mcp_server.py` | **BLOCKED / NOT RUN** | No secured HTTPS endpoint, production identity, or real client round-trip has been approved or tested. No service was deployed. |
+
+### Release gate
+
+Do not mark this branch production-ready yet. Remaining gates include distributed rate limiting, non-swallowing completion audit semantics, a trusted identity/membership administration model, semantic/independent result verification, external-side-effect idempotency/reconciliation, provider fault-injection integration tests, and a secured HTTPS deployment plus actual Plugin Creator round-trip. Deployment and plugin registration remain unperformed pending explicit approval.
