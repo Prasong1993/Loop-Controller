@@ -5,6 +5,7 @@
 - Deterministic Python/SQLite controller and FastAPI API.
 - OpenAI Responses API adapter for structured planning, proposal-only code generation, and allowlisted read-only tool orchestration.
 - Remote MCP server with a server-admin extension registry.
+- OpenAI Responses API read-only function-tool extensions configured through NEXUS_OPENAI_EXTENSION_MODULES.
 - NASA-style gate-readiness checklist and tests.
 
 This repository does not include an OpenAI API key, hosted service, registered ChatGPT app, or unlimited API usage. Configure your own credentials and deployment secrets.
@@ -40,6 +41,9 @@ curl -H "Authorization: Bearer $NEXUS_API_KEY" http://127.0.0.1:8000/openapi.jso
 Never paste tokens into chat, commit them, embed them in mobile-client code, or include them in logs/screenshots.
 
 ## OpenAI API activation
+
+Trusted read-only tool modules can be added to the Responses API path through NEXUS_OPENAI_EXTENSION_MODULES; see docs/OPENAI_TOOL_EXTENSIONS.md. Modules are server-admin configuration, not user input. Write/execute tools remain disabled on /ai/run.
+
 
 Paid OpenAI calls require both request-level budget_approved=true and server-level NEXUS_OPENAI_BUDGET_APPROVED=true. Both gates apply to /ai/plan, /ai/code-proposal, and /ai/run. Model availability and cost depend on your OpenAI Platform project; verify NEXUS_OPENAI_MODEL in your own account.
 

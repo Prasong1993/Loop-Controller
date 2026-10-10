@@ -66,6 +66,7 @@ Recent code work adds OpenAI Responses API structured plans, allowlisted code-fi
 - Extension registry and configuration: `docs/MCP_EXTENSIBILITY.md`
 - [NASA-style review gates](docs/NASA_STYLE_REVIEW_GATES.md)
 - [Local quickstart and deployment boundaries](docs/QUICKSTART.md)
+- [OpenAI Responses API tool extensions](docs/OPENAI_TOOL_EXTENSIONS.md)
 - Docker Compose package: `Dockerfile`, `docker-compose.yml`, `.env.example`
 
 ## Controller adapters
