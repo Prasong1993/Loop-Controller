@@ -69,3 +69,11 @@ uvicorn nexus.mcp_server:app --host 127.0.0.1 --port 8000
 Set `NEXUS_API_KEY` before remote use and terminate TLS at a trusted HTTPS gateway. Never expose the service publicly without security review. The adapter uses a shared bearer token as an interim gate, not production OAuth/identity.
 
 **ChatGPT account gate:** OpenAI's current Help Center documents full MCP apps/write actions for Business, Enterprise and Edu in beta, with developer mode/app creation managed via web/workspace settings. The currently reported Free plan is not documented as supporting this custom MCP app workflow. Therefore the source adapter can be tested in CI, but ChatGPT registration and end-to-end use are blocked until a supported account/interface and authorized setup path are available.
+
+
+## Source evidence verification
+
+- `POST /evidence/verify` fetches a public HTTPS text/HTML source and records VERIFIED only when the supplied exact quote is found in the fetched content.
+- Direct `POST /evidence` rejects status VERIFIED.
+- Fetch controls: HTTPS only, no embedded credentials, standard HTTPS port, public DNS/IP check, redirects disabled, 8-second timeout, 1 MB response limit, and text/HTML content types.
+- This is exact quote verification, not semantic entailment. High-impact claims still need reviewer confirmation. The fetcher requires production security review for DNS rebinding/SSRF and parser limitations.
