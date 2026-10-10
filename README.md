@@ -39,3 +39,10 @@ Cross-platform scope includes Android, iOS, iPadOS, web and server-side orchestr
 - [Evidence register](evidence/EVIDENCE_REGISTER.md)
 
 **Not production-ready:** CI/device test outcomes, authentication, production deployment, native mobile clients, evidence ingestion validation, and checkpoint restore are still open. Never expose the initial API publicly without security hardening.
+
+
+## Intended use and current integration status
+
+NEXUS targets use through the ChatGPT application on Android, iOS and iPadOS via a connected app/tool/API integration actually supported by the user's account and interface. A separate native NEXUS mobile app is not required. Physical device matrix testing is not a release gate unless native or OS-dependent functionality is added.
+
+**Live ChatGPT integration: NOT CONFIGURED / NOT RUN.** The repository contains controller/API source, not a deployed and connected service. CI passing does not prove that NEXUS can currently be called from ChatGPT. Authentication, secure deployment, evidence ingestion validation and checkpoint restoration remain open.
