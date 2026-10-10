@@ -107,6 +107,9 @@ class NexusCoreTests(unittest.TestCase):
         self.n.transition(dependency["task_id"],"POLICY")
         self.n.transition(dependency["task_id"],"EXECUTE")
         self.n.transition(dependency["task_id"],"VERIFY")
+        self.n.record_verification(dependency["task_id"],"independent-reviewer",
+                                   self.n.verify_and_add_evidence(self.project,"dependency result evidence",
+                                       "https://example.com","dependency result evidence")["evidence_id"])
         self.n.transition(dependency["task_id"],"AUDIT")
         self.n.transition(dependency["task_id"],"COMPLETE",result="dependency verified")
         self.assertEqual(self.n.transition(task["task_id"],"EXECUTE")["state"],"EXECUTE")
