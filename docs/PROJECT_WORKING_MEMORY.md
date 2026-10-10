@@ -170,37 +170,41 @@ Treat available skills and capabilities as reusable work patterns that can be ap
 - [ ] Tool/skill failures are isolated so unrelated work can continue.
 - [ ] The final report distinguishes skill guidance consulted, tool actions executed, and outcomes independently verified.
 
-## 14. Continuous code review, final compatibility review, and pre-delivery testing
+## 14. Work-lane compatibility, whole-system review, and one final CI submission
 
-Keep code review and testing as separate activities. The correct order is: review code continuously while it is being developed → perform a final whole-code compatibility review after integration → run the integrated test/CI/CD gate before delivery.
+The purpose of staged review is to catch compatibility defects by inspecting code before spending CI, test-run, API, or other tool resources. Do not repeatedly trigger expensive external checks while independent work lanes are still being developed. The normal flow is: **review each lane's code continuously → validate compatibility inside each lane → integrate all lanes → review/fix the entire codebase → submit the integrated revision to CI once for the final gate**.
 
-### A. During development — continuous code inspection (not continuous testing)
+### A. During development — continuous code inspection inside each work lane
 
-- Inspect code changes continuously as each component/work lane is developed. Review correctness, readability, control flow, interface contracts, imports/exports, types/schemas, error handling, security-sensitive paths, policy gates, idempotency, and consistency with the current requirements.
-- This step means reviewing and checking the code itself as it evolves; it does **not** mean repeatedly running tests throughout development as a mandatory continuous activity.
-- Run a focused check or a targeted test during development only when useful to investigate a suspected defect or validate a specific change. Do not label such targeted checks as a requirement for continuous testing.
-- Record meaningful findings, affected files/revisions, fixes, and unresolved concerns. Component-level review does not prove that the integrated system is compatible.
+- Each independent work lane is responsible for reviewing the code it produces as it evolves. Inspect correctness, control flow, requirements alignment, imports/exports, function signatures, types/schemas, error handling, security-sensitive paths, policy gates, idempotency, and configuration.
+- Before marking a lane complete, inspect the whole code group produced by that lane together—not just individual files—to verify that its modules, interfaces, dependencies, data contracts, and internal assumptions are mutually compatible and have no known code-level defects.
+- Fix issues found inside the lane before handing its output to integration. Record the lane's revision, reviewed files/contracts, findings, fixes, unresolved issues, and review status.
+- This step is code inspection and compatibility review, **not mandatory continuous test execution**. Do not repeatedly run CI or broad test suites for every small edit. A targeted local check is allowed when it materially helps diagnose a specific issue, but it is not the default activity.
+- A lane cannot be marked ready for integration while known compatibility errors remain unresolved. If an external dependency or another lane prevents a conclusion, mark that specific point BLOCKED/UNKNOWN rather than guessing.
 
-### B. After integration — final whole-code compatibility review
+### B. After all lanes are ready — integrate and review the whole codebase
 
-- Review the full integrated codebase as a whole before the final test gate. Check architecture and cross-component consistency: module boundaries, imports/exports, function signatures, schemas, event/status vocabulary, shared state, error handling, idempotency, policy gates, configuration, dependency constraints, and tool routing.
-- Resolve review findings before proceeding to the pre-delivery testing gate, where practical. If changes are made after a later test run, the relevant checks must be rerun.
-- This is a static compatibility/consistency review; it is not a substitute for automated tests.
+- Bring all completed work lanes together on the intended integration revision. Resolve duplicate implementations, conflicting edits, inconsistent naming/status vocabulary, incompatible schemas/signatures, missing exports/imports, dependency/configuration conflicts, shared-state assumptions, error-handling differences, policy-gate gaps, and incorrect tool routing.
+- Review the integrated codebase as a whole, including the boundaries between every work lane and the overall architecture. Check that all parts fit together and that there are no known code-level errors or unresolved compatibility defects.
+- Fix review findings before submitting the revision to CI. After fixes, inspect the changed code and the affected cross-component interfaces again. Continue this review/fix cycle until no known code errors or compatibility issues remain, or document a genuine blocker.
+- Keep a clear record of the exact integrated revision and the review evidence. Do not submit partial lane revisions to the final CI gate merely to check each lane separately.
 
-### C. Before delivery — integrated testing and CI/CD gate
+### C. Once the integrated review is clean — one final CI/test gate
 
-- After the final compatibility review and its fixes, run the appropriate integrated automated test suite and configured CI/CD checks before delivery: unit/component tests, integration tests, contract/schema tests, end-to-end tests where feasible, security/dependency checks, build/package checks, and deployment/smoke checks when in scope.
-- Investigate failures, fix them, and rerun affected checks. A change made after a successful test invalidates the relevant evidence until the affected checks are rerun.
-- Report each check as passed, failed, blocked, or not run, with links/logs/revision references where available. Never imply CI/CD or live tests ran if they did not.
-- If testing exposes a defect and code/configuration changes are made, return to the relevant code-review step, review the changed code, and rerun affected tests. Repeat this correction/review/test cycle until required checks pass or a real blocker is documented.
-- Freeze the delivered revision and tie the final report to its commit/revision and test evidence for that exact revision. If the revision changes afterward, re-evaluate the evidence.
+- Submit/push the integrated, reviewed revision to the configured CI system once for the normal final validation run, rather than triggering repeated CI runs during development or for each lane. This is the resource-efficient default, provided the repository's CI configuration and branch protections support it.
+- The final CI gate runs the checks configured for the project and appropriate to scope, such as unit/component, integration, contract/schema, end-to-end, security/dependency, build/package, and deployment/smoke checks. Do not claim a check ran if it is not configured or was not executed.
+- If the CI run passes, tie the result to the exact commit/revision being delivered. If CI fails, inspect the failure, fix the cause, re-review the changed code and affected interfaces, then rerun the necessary checks. A failed CI run must not be hidden merely to save tool usage; correctness and safety take priority over minimizing calls.
+- If any code changes after a passing CI run, rerun the checks affected by those changes before delivery. Avoid rerunning unrelated checks when reliable dependency/impact information shows they are unaffected; obey mandatory CI and repository protections.
+- Do not bypass required CI, branch protection, approvals, or safety checks in order to force a single run. “One final CI submission” is the intended efficient workflow, not a guarantee that failures or repository rules can never require another run.
 
 ### Acceptance criteria
 
-- [ ] Code is inspected continuously during development; this does not require tests to run continuously.
-- [ ] A final whole-code compatibility review is performed after integration and before the final test/CI gate.
-- [ ] Integrated automated tests and configured CI/CD checks are completed before delivery where configured and in scope.
-- [ ] Review findings or test failures that lead to code changes trigger review and reruns of affected checks.
-- [ ] The final report separates code-review findings, compatibility-review findings, and actual test results, and identifies unrun checks.
-- [ ] Test evidence refers to the exact delivered revision, or any later changes have triggered the necessary reruns.
+- [ ] Each lane continuously reviews its own code while developing.
+- [ ] Each lane reviews its complete code group for internal compatibility and resolves known defects before handoff.
+- [ ] All lanes are integrated before the final whole-system compatibility review.
+- [ ] The full codebase and cross-lane interfaces are reviewed and known issues fixed before the final CI submission.
+- [ ] Broad tests/CI are not repeatedly triggered during routine code edits; targeted checks are used only when useful.
+- [ ] The integrated revision is submitted to the configured final CI gate once by default, with additional runs only when failures, later changes, or required repository rules make them necessary.
+- [ ] The final report distinguishes code review from executed tests and cites the exact delivered revision and actual CI results.
+- [ ] No required test, approval, or safety gate is bypassed merely to reduce tool calls.
 
