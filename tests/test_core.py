@@ -72,16 +72,26 @@ class NexusCoreTests(unittest.TestCase):
         self.add_verified("official fact")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"EXECUTE")
-    def test_complete_requires_audited_result(self):
+    def test_complete_requires_persisted_verification_and_audited_result(self):
         t=self.n.create_task(self.project,"demo","expected","manual check")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.add_verified("official fact")
+        evidence=self.add_verified("official result evidence")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         self.n.transition(t["task_id"],"EXECUTE"); self.n.transition(t["task_id"],"VERIFY")
         self.n.transition(t["task_id"],"AUDIT")
-        with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"COMPLETE")
+        with self.assertRaisesRegex(PolicyDenied,"persisted passing verification"):
+            self.n.transition(t["task_id"],"COMPLETE",result="verified output")
+        self.assertEqual(self.n.get_verifications(t["task_id"]),[])
+        self.n.transition(t["task_id"],"RECOVER",reason="verification required")
+        self.n.transition(t["task_id"],"VERIFY",reason="redo independent verification")
+        record=self.n.record_verification(t["task_id"],"independent-reviewer",evidence["evidence_id"],
+                                          notes="Acceptance criteria checked")
+        self.assertEqual(record["evidence_status"],"VERIFIED")
+        self.assertEqual(self.n.get_verifications(t["task_id"])[0]["verification_id"],record["verification_id"])
+        self.n.transition(t["task_id"],"AUDIT")
         self.n.transition(t["task_id"],"COMPLETE",result="verified output")
         self.assertEqual(self.n.get_task(t["task_id"])["state"],"COMPLETE")
+
     def test_task_dependency_blocks_execute_until_dependency_is_complete(self):
         dependency=self.n.create_task(self.project,"dependency","dependency result","manual verification")
         task=self.n.create_task(self.project,"dependent task","task result","manual verification")
