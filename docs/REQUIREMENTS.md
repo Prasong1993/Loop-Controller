@@ -52,3 +52,17 @@
 | NXR-032 | Server-authoritative state | Critical task state is not dependent solely on a mobile process or local device storage | Architecture review and recovery test |
 | NXR-033 | Mobile background constraints | No promise of indefinite/unattended execution; OS-specific behavior is documented and tested on target versions | Platform review and device tests |
 | NXR-034 | Client secret safety | Server API keys are not embedded in Android/iOS/iPadOS clients | Static scan and security review |
+
+
+## Revision 1.1 — ChatGPT-app-first scope (2026-10-10)
+
+The intended user interface is the ChatGPT application on Android, iOS and iPadOS, using an integration that is actually supported by the target account/interface. Separate native NEXUS mobile apps are not required.
+
+| ID | Requirement | Acceptance criteria | Verification |
+|---|---|---|---|
+| NXR-035 | ChatGPT application is the target interface | Use a supported connected app/tool/API integration; do not assume availability before checking the target account | Integration acceptance |
+| NXR-036 | Live integration must be proven | No PASS/VERIFIED claim until a real request/response round-trip is captured | End-to-end acceptance |
+| NXR-037 | Physical-device testing is conditional | Required only for native or OS-dependent behavior, not merely because ChatGPT runs on mobile | Scope review |
+| NXR-038 | Permission and audit gate | Unauthorized actions are denied before execution; authorized test tasks are auditable and readable | Integration/security test |
+
+**Current integration status: NOT CONFIGURED / NOT RUN.** The repository's FastAPI code is not proof of a deployed or connected ChatGPT integration.
