@@ -39,3 +39,12 @@
 - Added Streamable HTTP MCP adapter, OpenAPI contract, ChatGPT integration contract, and official account-plan availability evidence.
 - CI run #53 passed for commit `4fa719ab1c678355cc0ff18894ec8c0519319c4d`; later commits require their own CI verification.
 - Live ChatGPT integration remains blocked until eligible account/workspace, secure HTTPS deployment and account-side connector registration are available.
+
+
+## 2026-10-10 — OpenAI capability and code proposal integration
+- Added a deterministic capability registry with explicit enabled/disabled/blocked/out-of-scope decisions rather than adding tools solely to increase the API count.
+- Added OpenAI Responses API structured plan proposals, project-scoped read-only function tools, and a code-proposal endpoint using the official code-generation model guidance. Code proposals are allowlisted and never written or executed by this service.
+- Added a double paid-API budget gate, structured usage/error records, trace IDs, project/task correlation, and record search.
+- Moved VERIFIED evidence creation behind trusted HTTPS fetch + quote match, pinned the connection to a validated public IP while preserving TLS hostname checks, and added task-scoped evidence with additive SQLite migration.
+- Consulted Anchor files only as references; recorded a boundary that excludes wholesale copying of their workflow, schema, code or project artifacts.
+- CI run #159 passed 67 tests on Python 3.11, 3.12 and 3.13. Live OpenAI provider access, code writing/execution, production deployment, production identity/tenant isolation and ChatGPT mobile integration remain NOT RUN/BLOCKED.
