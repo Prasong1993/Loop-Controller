@@ -183,11 +183,15 @@ class NexusApiTests(unittest.TestCase):
 
 
     def test_rest_lifecycle_runs_through_verified_completion(self):
-        headers={"Authorization":"Bearer test-secret","x-request-id":"lifecycle-trace"}
-        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+        headers={"Authorization":"Bearer executor-token","x-request-id":"lifecycle-trace"}
+        reviewer_headers={"Authorization":"Bearer reviewer-token","x-request-id":"lifecycle-verification"}
+        tokens={"executor-token":"executor","reviewer-token":"reviewer"}
+        with patch.dict(os.environ, {"NEXUS_API_TOKENS":__import__("json").dumps(tokens),"NEXUS_API_KEY":""}):
             project_response=self.client.post("/projects",json={"name":"rest-e2e-project"},headers=headers)
             self.assertEqual(project_response.status_code,201)
             project_id=project_response.json()["project_id"]
+            from nexus.api import project_authorization
+            project_authorization.grant_member(project_id,"reviewer")
             task_response=self.client.post("/tasks",json={"project_id":project_id,"title":"rest-e2e",
                 "expected_outcome":"verified result","verification_method":"assert final state"},
                 headers=headers)
@@ -210,16 +214,16 @@ class NexusApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code,200,response.text)
             # Verification is only recordable while the task is in VERIFY.
             verification=self.client.post(f"/tasks/{task_id}/verification",json={
-                "evidence_id":evidence.json()["evidence_id"],"verifier":"independent-reviewer",
-                "notes":"integration acceptance check"},headers=headers)
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"reviewer",
+                "notes":"integration acceptance check"},headers=reviewer_headers)
             self.assertEqual(verification.status_code,403)
             recover=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"RECOVER","reason":"verification gate"},headers=headers)
             self.assertEqual(recover.status_code,200,recover.text)
             verify_again=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"VERIFY","reason":"independent verification"},headers=headers)
             self.assertEqual(verify_again.status_code,200,verify_again.text)
             verification=self.client.post(f"/tasks/{task_id}/verification",json={
-                "evidence_id":evidence.json()["evidence_id"],"verifier":"independent-reviewer",
-                "notes":"integration acceptance check"},headers=headers)
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"reviewer",
+                "notes":"integration acceptance check"},headers=reviewer_headers)
             self.assertEqual(verification.status_code,200,verification.text)
             readback=self.client.get(f"/tasks/{task_id}/verification",headers=headers)
             self.assertEqual(readback.status_code,200)
