@@ -132,3 +132,18 @@ The ChatGPT-app-first scope has now been recorded in the following repository fi
 The platform compatibility matrix already states that native clients/device matrix testing are not required for the current scope. The error report still needs a matching explicit scope correction at the time of this checkpoint update.
 
 **A001 status: PARTIALLY COMPLETE — read back all updated files and update the error report/changelog before marking complete.** This action must not be closed until those files and this checkpoint are read back successfully.
+
+
+## 11. Documentation scope correction closeout — 2026-10-10
+
+Read-back verification completed for the following files after successful GitHub writes:
+- `docs/REQUIREMENTS.md` — ChatGPT-app-first requirements and conditional device tests recorded.
+- `docs/VERIFICATION_PLAN.md` — integration acceptance cases NXT-017 through NXT-022 recorded as NOT RUN.
+- `docs/IMPLEMENTATION.md` — deployment/integration boundary and production gaps recorded.
+- `README.md` — intended interface and NOT CONFIGURED status recorded.
+- `docs/NEXUS_SDRD_v1.0_TH.md` — scope and acceptance gate recorded.
+- `docs/ERROR_REPORT.md` — native clients/device tests correctly scoped out; real integration remains a blocker.
+- `docs/PLATFORM_COMPATIBILITY.md` — ChatGPT-app-first target and conditional device test policy already recorded.
+- `CHANGELOG.md` — scope correction recorded.
+
+**NEXUS-A001: COMPLETE (documentation change only).** This does not mean live ChatGPT integration is complete. NEXUS-A002 through A006 remain open/not configured as described above. The latest CI run recorded in this checkpoint remains run #12; confirm newer runs before relying on it for a release decision.
