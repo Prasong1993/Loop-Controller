@@ -36,6 +36,8 @@ class OpenAIWorkerTests(unittest.TestCase):
         self.assertEqual(result["output_text"],"done")
         self.assertEqual(result["tool_calls"][0]["outcome"],"executed")
         self.assertTrue(any(x["record_type"]=="decision" for x in seen))
+        self.assertTrue(any(x.get("outcome")=="request_started" for x in seen))
+        self.assertTrue(any(x.get("outcome")=="tool_execution_completed" for x in seen))
         self.assertEqual(result["usage"]["input_tokens"],15)
         self.assertEqual(result["usage"]["output_tokens"],5)
         self.assertTrue(any(x["record_type"]=="usage" and "usage" in x for x in seen))
