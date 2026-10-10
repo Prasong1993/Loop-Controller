@@ -30,3 +30,12 @@
 - Made physical-device testing conditional on native/OS-specific features instead of a universal release gate.
 - Added explicit live integration acceptance tests; status remains NOT CONFIGURED / NOT RUN until a real integration round-trip is evidenced.
 - Added a NASA-style recovery checkpoint and action register; this is a project adaptation, not NASA certification.
+
+
+## 2026-10-10 — Controller hardening increment
+- Added guarded checkpoint restore with policy restrictions against replaying EXECUTE-state checkpoints.
+- Added remote fail-closed bearer-token gate and API error mapping tests.
+- Added HTTPS source quote verification; direct API claims cannot be marked VERIFIED without fetching content and matching a quote.
+- Added Streamable HTTP MCP adapter, OpenAPI contract, ChatGPT integration contract, and official account-plan availability evidence.
+- CI run #53 passed for commit `4fa719ab1c678355cc0ff18894ec8c0519319c4d`; later commits require their own CI verification.
+- Live ChatGPT integration remains blocked until eligible account/workspace, secure HTTPS deployment and account-side connector registration are available.
