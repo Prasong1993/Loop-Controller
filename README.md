@@ -1,6 +1,6 @@
 # NEXUS — AI Workflow Control Layer
 
-**สถานะ:** Initial design / evidence review pending  
+**สถานะ:** Controller prototype + CI ผ่าน; live ChatGPT integration ยัง NOT CONFIGURED / NOT RUN  
 **เอกสารหลัก:** [NEXUS System Design Reference Document (SDRD)](docs/NEXUS_SDRD_v1.0_TH.md)
 
 NEXUS เป็นชั้นควบคุม workflow สำหรับงานที่ AI ช่วยวิเคราะห์ วางแผน และใช้เครื่องมือ โดยตรวจ policy ก่อน execute ตรวจผลก่อนส่งมอบ และเก็บหลักฐานที่ตรวจสอบย้อนหลังได้
