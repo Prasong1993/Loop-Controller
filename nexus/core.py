@@ -125,6 +125,11 @@ class NEXUS:
         import hashlib
         if not claim.strip() or not quoted_text.strip():
             raise PolicyDenied("claim and quoted_text are required for verification")
+        # Reject unknown projects before any outbound source fetch; recheck inside
+        # the insert transaction to handle concurrent project deletion/mutation.
+        with self._connect() as con:
+            if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
+                raise ValueError("unknown project_id")
         try:
             fetched=verify_source_quote(source_url,quoted_text)
         except EvidenceFetchError:
