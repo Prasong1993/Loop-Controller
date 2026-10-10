@@ -119,17 +119,17 @@ def nexus_restore_checkpoint(task_id:str,checkpoint_id:str,reason:str="Approved 
 
 @mcp.tool()
 @track_tool
-def nexus_add_unverified_evidence(project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="")->dict:
+def nexus_add_unverified_evidence(project_id:str,claim:str,status:str,source_url:str|None=None,notes:str="",task_id:str|None=None)->dict:
     """Record RECOVERED, UNKNOWN or BLOCKED evidence. VERIFIED is prohibited here; use source quote verification."""
     if status=="VERIFIED":
         raise PolicyDenied("Use nexus_verify_source_evidence to record VERIFIED evidence")
-    return controller.add_evidence(project_id,claim,status,source_url,notes)
+    return controller.add_evidence(project_id,claim,status,source_url,notes,task_id)
 
 @mcp.tool()
 @track_tool
-def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_text:str,notes:str="")->dict:
+def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_text:str,notes:str="",task_id:str|None=None)->dict:
     """Fetch and verify source content inside the trusted core boundary."""
-    return controller.verify_and_add_evidence(project_id,claim,source_url,quoted_text,notes,"chatgpt-source-verifier")
+    return controller.verify_and_add_evidence(project_id,claim,source_url,quoted_text,notes,"chatgpt-source-verifier",task_id)
 
 @mcp.tool()
 @track_tool
