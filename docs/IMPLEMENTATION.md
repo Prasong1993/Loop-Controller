@@ -70,7 +70,7 @@ Set `NEXUS_API_KEY` in the server environment and send `Authorization: Bearer <t
 
 Unknown project/task/checkpoint identifiers map to HTTP 404; policy denials map to HTTP 403; invalid workflow transitions map to HTTP 409. Safe checkpoint restore is allowed only from BLOCKED/RECOVER and refuses checkpoints at EXECUTE or other unsafe states.
 
-The API contract is documented in [openapi.yaml](../openapi.yaml) and [ChatGPT Integration Contract](CHATGPT_INTEGRATION_CONTRACT.md). The OpenAI component selection and current enablement gates are recorded in [OpenAI Capability Matrix](OPENAI_CAPABILITY_MATRIX.md); the machine-readable allowlist is in `nexus/capabilities.py`.
+The API contract is documented in [openapi.yaml](../openapi.yaml) and [ChatGPT Integration Contract](CHATGPT_INTEGRATION_CONTRACT.md). Operational log fields, event types and search workflow are documented in [OPERATIONAL_RECORD_SCHEMA.md](OPERATIONAL_RECORD_SCHEMA.md). The OpenAI component selection and current enablement gates are recorded in [OpenAI Capability Matrix](OPENAI_CAPABILITY_MATRIX.md); the machine-readable allowlist is in `nexus/capabilities.py`.
 
 ## Remaining production/integration gaps
 Tenant isolation tied to authenticated identities, task-level requirement/claim traceability and evidence freshness, restore/idempotency stress tests, rate limiting, redacted logs, backup/restore, secure deployment and a supported ChatGPT connector/adapter remain open. Core source-content verification and additive task-scope migration are implemented and covered by CI tests; production network security still needs review. Do not expose the API publicly until reviewed and deployed securely.
