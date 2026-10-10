@@ -54,6 +54,7 @@ class OpenAIResponsesWorker:
         conversation: list[Any] = [{"role": "user", "content": prompt}]
         executed: list[dict[str, Any]] = []
         decisions: list[dict[str, Any]] = []
+        usage_total = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
         def log(record_type: str, **fields: Any) -> None:
             if record:
@@ -72,15 +73,25 @@ class OpenAIResponsesWorker:
                 raise OpenAIWorkerError("OpenAI Responses API request failed") from exc
 
             output = list(getattr(response, "output", []) or [])
+            usage = getattr(response, "usage", None)
+            usage_round = {}
+            if usage is not None:
+                for key in usage_total:
+                    value = getattr(usage, key, None)
+                    if isinstance(value, int) and value >= 0:
+                        usage_round[key] = value
+                        usage_total[key] += value
+            log("usage", outcome="response_received", round=round_index,
+                response_id=getattr(response, "id", None), usage=usage_round)
             conversation.extend(output)
             calls = [item for item in output if getattr(item, "type", None) == "function_call"]
             if not calls:
                 log("usage", outcome="completed", round=round_index,
-                    response_id=getattr(response, "id", None))
+                    response_id=getattr(response, "id", None), usage_total=usage_total)
                 return {"response_id": getattr(response, "id", None),
                         "output_text": getattr(response, "output_text", ""),
                         "tool_calls": executed, "policy_decisions": decisions,
-                        "rounds": round_index + 1}
+                        "rounds": round_index + 1, "usage": usage_total}
 
             if round_index >= self.max_tool_rounds:
                 log("error", error_class="ToolRoundLimit", error_code="TOOL_ROUND_LIMIT",
