@@ -1,0 +1,46 @@
+# TR-REQ-001 — Deterministic Tool Router
+
+Status: **IMPLEMENTED IN FEATURE BRANCH; CI AND LIVE PROVIDER INTEGRATION NOT YET VERIFIED**
+
+## Scope
+
+This change adds `nexus.router.ToolRouter`, an adapter-based execution boundary. It does not add provider credentials, discover account quotas by itself, or claim that any external model is connected. A real integration must implement the adapter contract and supply truthful preflight results.
+
+## Routing rules
+
+1. Reject candidates that are disabled, unauthorized, lack the required capability, or already carry a warning.
+2. Try eligible free candidates in caller-supplied priority order.
+3. A candidate is runnable only when preflight explicitly confirms `available=True` and `quota_available=True`, with no warning.
+4. Paid candidates are considered only when both `allow_paid=True` and `budget_approved=True`.
+5. Fall back after a provider error only when the adapter explicitly classifies it with `fallback_safe=True`. Unclassified exceptions stop routing.
+6. Verify each returned result before accepting it. If verification fails, stop rather than risk repeating a side effect on another provider.
+7. Emit structured audit events and checkpoints through optional sinks. Production wiring must connect these sinks to durable storage; the router's returned event/checkpoint lists alone are in-memory results.
+
+## Adapter contract
+
+An adapter implements:
+- `preflight() -> Mapping`: must explicitly return availability and quota facts; unknown values are not treated as available.
+- `execute(task) -> result`: perform one authorized provider/tool operation.
+- `verify(task, result) -> bool | Mapping`: return `True` or a mapping with `passed=True` only after checking acceptance criteria.
+
+Raise `ProviderError(code, message, fallback_safe=True)` only when the error is known to be safe for trying a different candidate. Do not classify authentication errors, policy denials, unknown errors, or potentially completed side effects as fallback-safe.
+
+## Test coverage added
+
+- Free-first ordering over paid options
+- Quota-exhaustion fallback
+- Explicit paid approval and budget gate
+- Permission exclusion
+- Explicitly safe transient failure fallback
+- Unclassified error stops routing
+- Warning/preflight handling
+- Verification failure stops fallback
+- Audit/checkpoint sink callbacks
+
+## Remaining verification
+
+- CI must run against the branch/PR.
+- No real provider adapter or live quota endpoint is included in this change.
+- No API key or provider account has been called by these tests.
+- Durable audit/checkpoint integration with the existing SQLite controller remains a wiring task.
+- Production behavior, rate limits, and live fallback remain **UNKNOWN / NOT RUN** until exercised against an authorized provider integration.
