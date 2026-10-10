@@ -23,3 +23,10 @@
 ## 2026-10-10 — CI verification
 - Observed GitHub Actions run #9 complete successfully on Python 3.11, 3.12 and 3.13; compile and unit test steps passed.
 - Native-device, security and production deployment validation remain open.
+
+
+## 2026-10-10 — ChatGPT-app-first scope correction
+- Clarified that ChatGPT on Android, iOS and iPadOS is the intended interface through a supported integration; a separate native NEXUS mobile app is out of scope.
+- Made physical-device testing conditional on native/OS-specific features instead of a universal release gate.
+- Added explicit live integration acceptance tests; status remains NOT CONFIGURED / NOT RUN until a real integration round-trip is evidenced.
+- Added a NASA-style recovery checkpoint and action register; this is a project adaptation, not NASA certification.
