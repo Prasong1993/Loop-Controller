@@ -49,7 +49,7 @@ class OpenAIPlanGenerator:
                  model: str | None = None, api_key: str | None = None):
         self.record_store = record_store
         self.client = client
-        self.model = model or os.getenv("NEXUS_OPENAI_MODEL", "gpt-4.1-mini")
+        self.model = model or os.getenv("NEXUS_OPENAI_MODEL", "gpt-6-luna")
         self.api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
 
     def _client(self):
@@ -74,7 +74,7 @@ class OpenAIPlanGenerator:
             raise ValueError("task must be at most 20000 characters")
         constraints = constraints or []
         capabilities = list(dict.fromkeys(capabilities or []))
-        allowed = {"web_search", "code_interpreter"}
+        allowed = {"web_search"}
         if set(capabilities) - allowed:
             raise ValueError("capability is not enabled in this implementation")
         trace_id = trace_id or str(uuid.uuid4())
