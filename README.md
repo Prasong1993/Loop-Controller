@@ -46,3 +46,12 @@ Cross-platform scope includes Android, iOS, iPadOS, web and server-side orchestr
 NEXUS targets use through the ChatGPT application on Android, iOS and iPadOS via a connected app/tool/API integration actually supported by the user's account and interface. A separate native NEXUS mobile app is not required. Physical device matrix testing is not a release gate unless native or OS-dependent functionality is added.
 
 **Live ChatGPT integration: NOT CONFIGURED / NOT RUN.** The repository contains controller/API source, not a deployed and connected service. CI passing does not prove that NEXUS can currently be called from ChatGPT. Authentication, secure deployment, evidence ingestion validation and checkpoint restoration remain open.
+
+
+## Integration and recovery references
+- [ChatGPT Integration Contract](docs/CHATGPT_INTEGRATION_CONTRACT.md)
+- [OpenAPI contract](openapi.yaml)
+- [NASA-style checkpoint and action register](docs/CHECKPOINT_NEXUS_2026-10-10.md)
+- [Error and limitation report](docs/ERROR_REPORT.md)
+
+Recent code work adds a remote fail-closed bearer-token gate and guarded checkpoint restoration. These do not mean the API has been deployed or connected to ChatGPT; the live integration remains NOT CONFIGURED / NOT RUN.
