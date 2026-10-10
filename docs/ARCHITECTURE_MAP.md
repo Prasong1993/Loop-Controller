@@ -28,9 +28,9 @@ Any missing permission, required evidence, budget approval, tool registration or
 ## 4. Critical interfaces and invariants
 1. REST and MCP must call the same deterministic core; no duplicated business rules.
 2. `VERIFIED` evidence can only be created by a trusted fetch-and-match boundary; caller-supplied text is never proof.
-3. OpenAI plan generation requires both request approval and a server-side budget approval setting; absent approval means no provider call.
+3. OpenAI plan generation requires both request approval and a server-side budget approval setting; absent approval means no provider call. The current default model is `gpt-6-luna` based on the official model catalog; actual account access and current price must be checked before enabling spend. Only the `web_search` capability is enabled for planner calls; code interpreter is not enabled without verified compatibility for the selected model.
 4. OpenAI function calls must be declared, registered, parsed, project-scoped and explicitly ALLOWed by deterministic policy before a handler runs.
-5. Current first-run tool allowlist is read-only: project status, task detail, audit. Write/execute tools are out of scope until explicit policy, approvals, idempotency and outcome reconciliation are implemented and tested.
+5. The OpenAI `/ai/run` allowlist is read-only: project status, task detail, audit. MCP separately exposes workflow mutations (create task, request state transition, checkpoint/restore, evidence recording); each uses the same core gate, but tenant/user authorization is still only a shared bearer token and remains a production blocker. No arbitrary shell or code-execution tool is exposed by the OpenAI worker.
 6. Every request/tool/provider action records a traceable redacted operational event where possible. Logging failure must never turn a denied action into an allowed action.
 7. Project/task/evidence/audit state and operational records use SQLite in the current implementation; a transaction spanning separate databases is not assumed atomic. Prefer one configured database path unless isolation is intentionally configured.
 8. Model/provider failures are not automatically retried if a tool may have side effects. Current exposed OpenAI tools are read-only; any future side-effecting tool requires idempotency and ambiguous-outcome reconciliation.
