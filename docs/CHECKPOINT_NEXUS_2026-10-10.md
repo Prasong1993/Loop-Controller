@@ -117,3 +117,18 @@ All checks below remain **NOT RUN** until a real supported integration is config
 | Date | Change |
 |---|---|
 | 2026-10-10 | Created recovery checkpoint to capture current NEXUS implementation state, approved ChatGPT-app-first scope, NASA-style review gates, unresolved gaps and prioritized resume actions. |
+
+
+## 10. Checkpoint update — 2026-10-10
+
+### A001 progress
+The ChatGPT-app-first scope has now been recorded in the following repository files:
+- `docs/REQUIREMENTS.md`
+- `docs/VERIFICATION_PLAN.md`
+- `docs/IMPLEMENTATION.md`
+- `README.md`
+- `docs/NEXUS_SDRD_v1.0_TH.md`
+
+The platform compatibility matrix already states that native clients/device matrix testing are not required for the current scope. The error report still needs a matching explicit scope correction at the time of this checkpoint update.
+
+**A001 status: PARTIALLY COMPLETE — read back all updated files and update the error report/changelog before marking complete.** This action must not be closed until those files and this checkpoint are read back successfully.
