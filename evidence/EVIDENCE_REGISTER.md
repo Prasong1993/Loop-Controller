@@ -45,3 +45,7 @@ The following official pages were opened and inspected during this update. These
 | NXS-012 | NASA — System Design Processes | https://www.nasa.gov/reference/4-0-system-design-processes/ | Official NASA system design process reference exists and can inform process design | VERIFIED | Does not certify NEXUS or imply NASA endorsement |
 
 Inspection method: opened official pages using live scrape on 2026-10-10. Exact account-specific integrations, device tests, deployment behavior, and provider quotas remain UNKNOWN until independently checked.
+
+
+| NXS-013 | OpenAI Help — Developer mode and MCP apps in ChatGPT | https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt | Official product documentation | Full MCP support/write actions are rolling out in beta to Business, Enterprise and Edu; app setup uses web/workspace developer mode | VERIFIED | User-account access must still be confirmed; current reported plan is Free |
+| NXS-014 | OpenAI Help — Build with the Apps SDK | https://help.openai.com/en/articles/12515353-build-with-the-apps-sdk | Official product documentation | Apps SDK uses MCP and supports building/testing apps inside ChatGPT; availability depends on developer-mode access | VERIFIED | Does not prove NEXUS is deployed or registered |
