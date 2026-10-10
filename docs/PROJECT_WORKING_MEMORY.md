@@ -341,3 +341,44 @@ Long-running work loses continuity when the next conversation lacks the correct 
 - **Next permitted action:** reconcile the current repository implementation and roadmap against these capabilities; identify the existing checkpoint/resume components and their evidence, map each requirement to code/interface/tests, and record the first concrete implementation gap before changing runtime code.
 - **No PR merge authorized.** PR #3 remains subject to explicit user approval.
 
+## 18. Project-wide master database and phase-scoped databases
+
+Decision recorded: the project requires one authoritative project-wide master database plus a dedicated database or logically isolated data scope for each of five phases. This is a required architecture direction, not yet proof that six physical databases exist or are implemented.
+
+### Ownership and boundaries
+- **Project Master Database** is the authoritative source for project identity, global requirements, approved decisions, canonical evidence registry/references, phase definitions and dependencies, current overall checkpoint, cross-phase artifact references, global risks, shared audit lineage, and current repository/branch/commit baseline.
+- **Phase 1 database/scope — Research & Evidence:** source provenance, retrieval time, evidence status, verification method, source revision/hash, evidence gaps, and curated handoff package.
+- **Phase 2 database/scope — Requirements & Design:** requirements, acceptance criteria, design decisions, traceability to Phase 1 evidence, interface/schema contracts, and design handoff.
+- **Phase 3 database/scope — Implementation:** work units, code/artifact paths, commit references, implementation decisions, dependency versions, changed-file manifests, and implementation handoff.
+- **Phase 4 database/scope — Testing & Verification:** test cases, commands/configuration, exact tested revision, results, failures, regression links, verification evidence, and unresolved defects.
+- **Phase 5 database/scope — Release & Recovery:** release/approval status, deployment or delivery evidence, backup manifests, restore tests, recovery outcomes, and final operational checkpoint.
+
+### Routing and phase access contract
+- Each phase must declare its required input data, authorized read scopes, allowed write scope, output schema, acceptance criteria, and handoff requirements.
+- The controller selects the active phase from the authoritative master checkpoint; a phase must not choose a project or phase solely from conversational context.
+- Phases read canonical shared facts from the master registry and consume prior-phase outputs by immutable IDs and versions/hashes, not by copying untracked claims.
+- A phase may write its own working records and submit approved summary/artifact references to the master. It must not silently overwrite another phase's records or redefine global facts.
+- Before phase transition, validate required inputs, artifact versions, acceptance criteria, unresolved blockers, and evidence lineage. A failed gate keeps the project at the current phase.
+- Every cross-database or cross-scope transfer must record source ID/version, destination ID/version, transfer time, and verification result. Do not assume transactions across separate SQLite files are atomic.
+- Project ID, phase ID, task ID, run ID, trace ID, and artifact/evidence IDs must prevent cross-project or cross-phase contamination.
+- The master checkpoint must identify the current phase/work unit, last verified repository commit, completed and unfinished work, blockers, and the next permitted action.
+
+### Physical database vs logical isolation
+The requirement is **one master plus five phase-specific data boundaries**. During implementation, assess whether six separate SQLite files are actually necessary or whether one SQLite database with strict phase-scoped tables/namespaces and foreign-key constraints better preserves atomicity and audit consistency. Do not claim six physical database files unless they are created, migrated, tested, backed up, and restored independently. The design choice must be justified by isolation, consistency, backup, and recovery requirements.
+
+### Acceptance tests required
+- A phase can retrieve only its authorized project and phase data.
+- Each phase reads the intended canonical master records and exact upstream handoff versions.
+- Updating a phase-local record does not silently change master facts or other phases' records.
+- Missing/stale/conflicting input blocks the phase gate instead of being treated as verified.
+- Cross-project and cross-phase ID substitution is rejected.
+- A new conversation can resolve the project, current phase, latest verified commit, exact checkpoint, outstanding blockers, and next permitted work unit from persisted state.
+- Checkpoint and handoff updates can be read back and reconciled with repository artifacts.
+- Backup/restore preserves master-to-phase links, IDs, versions, and audit lineage.
+
+### Current status
+- Architecture decision/requirement: RECORDED.
+- Existing implementation of all six data boundaries and deterministic phase routing: UNKNOWN pending source-level mapping and tests.
+- Database isolation, cross-phase handoffs, and recovery acceptance tests: NOT_RUN until evidenced by test results.
+- Next action: map existing SQLite schema/core/checkpoint/evidence/task APIs to the master-plus-five-phase contract; identify what exists, then implement the smallest high-value gap without merging PR #3.
+
