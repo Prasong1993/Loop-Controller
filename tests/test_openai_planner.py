@@ -53,6 +53,10 @@ class OpenAIPlanTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             planner.propose(project_id="p1",task="run code",budget_approved=True,capabilities=["code_interpreter"])
         self.assertIsNone(self.fake.kwargs)
+    def test_no_optional_tool_omits_tools_parameter(self):
+        planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
+        planner.propose(project_id="p1",task="test",budget_approved=True)
+        self.assertNotIn("tools",self.fake.kwargs)
     def test_unknown_capability_rejected(self):
         planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
         with self.assertRaises(ValueError):
