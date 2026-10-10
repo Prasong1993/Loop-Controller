@@ -9,6 +9,7 @@ import os
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from nexus.core import NEXUS, PolicyDenied
+from nexus.evidence import EvidenceFetchError, verify_source_quote
 
 app=FastAPI(title="NEXUS Controller API",version="0.2.0",
  description="Evidence-first deterministic workflow controller")
@@ -26,6 +27,12 @@ class EvidenceIn(BaseModel):
     claim:str=Field(min_length=1,max_length=2000)
     status:str
     source_url:str|None=None
+    notes:str=""
+class VerifyEvidenceIn(BaseModel):
+    project_id:str
+    claim:str=Field(min_length=1,max_length=2000)
+    source_url:str=Field(min_length=1,max_length=2000)
+    quoted_text:str=Field(min_length=1,max_length=5000)
     notes:str=""
 class TransitionIn(BaseModel):
     to_state:str
@@ -87,6 +94,15 @@ def restore_checkpoint(task_id:str,body:RestoreIn):
 @app.post("/evidence",dependencies=[Depends(require_api_key)])
 def add_evidence(body:EvidenceIn):
     return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes)
+
+@app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
+def verify_evidence(body:VerifyEvidenceIn):
+    try:
+        proof=verify_source_quote(body.source_url,body.quoted_text)
+    except EvidenceFetchError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    return invoke(controller.add_verified_evidence,body.project_id,body.claim,body.source_url,
+                  proof["quoted_text"],proof["source_text"],body.notes,"api-source-verifier")
 @app.get("/projects/{project_id}/audit",dependencies=[Depends(require_api_key)])
 def audit(project_id:str,task_id:str|None=None): return invoke(controller.audit,project_id,task_id)
 @app.post("/policy/route",dependencies=[Depends(require_api_key)])
