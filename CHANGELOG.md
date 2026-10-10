@@ -77,4 +77,4 @@
 - Dependencies are restricted to tasks in the same project; self-links, cycles, duplicates and changes after the policy gate are rejected.
 - `EXECUTE` is blocked until every declared dependency is `COMPLETE`.
 - Added REST and MCP dependency operations, documented both REST operations in `openapi.yaml`, and added core/API/contract regression tests.
-- Final CI for this increment is pending; do not mark these new changes PASS until a run for the resulting commit completes.
+- GitHub Actions run #262 passed on Python 3.11, 3.12 and 3.13 for commit `17eddd28d6ca87b04dd4697b829ddf5787e2302c`; each matrix job passed 4 OpenAPI contract tests and 97 unit tests: https://github.com/Prasong1993/Loop-Controller/actions/runs/38077231119.
