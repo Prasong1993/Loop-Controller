@@ -52,6 +52,8 @@ class RecordStoreTests(unittest.TestCase):
             {"event":{"prompt":"user private prompt"}},
             {"file_summary":[{"file_content":"source code"}]},
             {"nested":{"tool_arguments":{"password":"secret"}}},
+            {"review":{"source_code":"private source"}},
+            {"model":{"generated_code":"unreviewed generated code"}},
         ]:
             with self.subTest(payload=payload):
                 with self.assertRaises(ValueError):
