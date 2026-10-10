@@ -514,3 +514,32 @@ These source files show existing implementation claims at source level only. The
 - Live cost comparison and savings: NOT RUN.
 - Paid API activity: NOT AUTHORIZED by this checkpoint.
 - Next action: map existing code and acceptance tests, then collect current official API/model/pricing evidence before proposing or implementing changes.
+
+
+## 23. API lifecycle research — command intake through verified delivery
+
+**Research checkpoint:** 2026-10-11  
+**Research artifact:** [`docs/WORKFLOW_API_LIFECYCLE_RESEARCH.md`](WORKFLOW_API_LIFECYCLE_RESEARCH.md)  
+**Status:** Official documentation reviewed and source-level mapping recorded; live account/provider tests NOT RUN.
+
+### Current recommendation
+- Keep OpenAI Responses API as the primary model boundary for now. The existing planner, adapter, deterministic router and audit components already align with this pattern.
+- Use Structured Outputs for task/plan handoffs and Function Calling for model-proposed calls to allowlisted application tools. Neither structured JSON nor a tool request grants permission or proves an action succeeded.
+- Keep task identity, context restore, evidence registry, policy/budget gates, route selection, checkpoints, audit, external execution and independent verification in the application/controller.
+- Consider Agents API only if its managed Codex runtime is demonstrably useful for long-running tasks; consider Agents SDK only if its application-side loop reduces complexity without weakening controller-owned policy and persistence.
+- Use Evals API for offline/regression evaluation, prompt caching for repeated stable prefixes, and Batch API for eligible non-interactive bulk tasks. These are conditional optimizations, not mandatory APIs for every request.
+- Official public short-context standard prices retrieved 2026-10-11: `gpt-6-luna` $0.10/M input and $0.50/M output; `gpt-6.1-sol` $2/M input and $10/M output; `gpt-6-astra` $10/M input and $50/M output. These do not establish account entitlement or actual cost. See the research artifact for the pricing URL, illustrative calculations, conditions, and caveats.
+- A hypothetical 10k input + 2k output token request would cost approximately $0.002 on `gpt-6-luna`, $0.04 on `gpt-6.1-sol`, and $0.20 on `gpt-6-astra` at those listed short-context rates, before separately priced tools, retries, extra rounds, and infrastructure. This is a calculation, not a measured result.
+
+### Source inspection findings
+- `nexus/openai_adapter.py`, `nexus/openai_planner.py`, `nexus/router.py`, capability matrix and adapter contract were read from the active branch.
+- The router source shows free-first routing and requires both paid-use permission and budget approval for paid candidates. Preflight unknowns do not pass; unsafe/unclassified failures stop; verification failure stops fallback to avoid duplicate side effects.
+- A source-level risk was found in `nexus/openai_planner.py`: its `_record()` catches exceptions and silently passes. This conflicts with the Working Memory's fail-closed requirement for mandatory audit writes. It is NOT fixed by this research checkpoint and needs a targeted test before a code change.
+- Direct control of hidden chain-of-thought or the user's private ChatGPT Android session is not claimed. The app-to-repository integration is NOT VERIFIED.
+
+### Status and next action
+- Official docs review: VERIFIED — DOC REVIEW.
+- Existing components: VERIFIED — SOURCE FILES.
+- Current account model entitlement, quota, billing, live request and real per-task cost: UNKNOWN / NOT RUN.
+- Paid API activity: NOT AUTHORIZED by this checkpoint.
+- Next: map lifecycle acceptance tests, inspect the recorded failed CI logs, fix only demonstrated defects, run offline/mock tests, and request approval before bounded live-provider testing.
