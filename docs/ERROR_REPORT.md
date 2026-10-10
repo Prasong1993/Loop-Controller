@@ -119,3 +119,7 @@ GitHub Actions run #121: https://github.com/Prasong1993/Loop-Controller/actions/
 
 ## Latest code verification read-back
 GitHub Actions run #159: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015447654 — compile and 67 tests passed on Python 3.11, 3.12 and 3.13. This run includes the REST operational-record scope fix. The remaining blockers are external integration/deployment and unimplemented code writing/execution, not a failing CI suite.
+
+
+## Latest CI including OpenAPI and record redaction
+Run #174: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015687274 — on Python 3.11, 3.12 and 3.13, the dedicated OpenAPI contract checks passed (4 checks) and the full unit/regression suite passed (73 tests). Record persistence now rejects common credential and raw-content keys recursively. Production identity, tenant isolation, retention/encryption, code execution, remote deployment and ChatGPT mobile integration remain unresolved.
