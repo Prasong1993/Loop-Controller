@@ -115,3 +115,7 @@ GitHub Actions run #121: https://github.com/Prasong1993/Loop-Controller/actions/
 - The endpoint does not write files, apply patches, run tests or execute code. It logs file hashes and metadata rather than raw code.
 - GitHub Actions run #150 passed compile + 67 tests on Python 3.11, 3.12 and 3.13: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015297401.
 - Remaining release blockers: no live provider call/API entitlement check, no code-write/execution adapter, no secure deployment or production identity/tenant isolation, and no registered ChatGPT mobile integration.
+
+
+## Latest code verification read-back
+GitHub Actions run #159: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015447654 — compile and 67 tests passed on Python 3.11, 3.12 and 3.13. This run includes the REST operational-record scope fix. The remaining blockers are external integration/deployment and unimplemented code writing/execution, not a failing CI suite.
