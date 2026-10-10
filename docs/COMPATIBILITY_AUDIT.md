@@ -130,7 +130,7 @@ This update records source changes made after the initial static audit. It does 
 | NX-A01 — forged VERIFIED evidence via caller-supplied source text | Core legacy method now denies caller-supplied source text; `verify_and_add_evidence` fetches and matches a quote inside the trusted core boundary; project existence is checked before outbound fetch. | FIX IMPLEMENTED; unit/CI status must be checked on the latest commit. |
 | NX-A02 — DNS validation/connection TOCTOU | HTTPS fetch uses a pinned validated public IP and TLS hostname verification; redirects remain blocked; body and timeout bounds remain. | FIX IMPLEMENTED; current unit tests cover handler type and private DNS denial; no live adversarial network test. |
 | NX-A03 — version mismatch | REST and MCP health read `nexus/version.py` (0.4.0). | STATIC READ-BACK REQUIRED; CI check pending. |
-| NX-A04 — no end-to-end lifecycle/API contract verification | Added REST lifecycle through verified COMPLETE and audit readback, task-scope/migration, budget-gate, OpenAI tool-scope, source-transport and usage-accounting tests. | PARTIAL — CI run #121 passed 58 tests on Python 3.11/3.12/3.13; no remote E2E, live provider call or ChatGPT mobile invocation. |
+| NX-A04 — no end-to-end lifecycle/API contract verification | Added REST lifecycle through verified COMPLETE and audit readback, task-scope/migration, budget-gate, OpenAI tool-scope, source-transport and usage-accounting tests. | PARTIAL — CI run #150 passed 67 tests on Python 3.11/3.12/3.13; no remote E2E, live provider call or ChatGPT mobile invocation. |
 | NX-A05 — inconsistent error mapping | `EvidenceFetchError` maps to HTTP 422 before generic `ValueError`; common error mapping remains incomplete for all REST/MCP paths. | PARTIAL. |
 | NX-A06 — evidence not tied to task/claim requirements | Added optional task_id to evidence; task-specific VERIFIED evidence satisfies only the linked task's PLAN gate; project-wide evidence remains explicit via null task_id. Cross-project task links are denied and old SQLite schemas migrate. | PARTIAL — requirement/claim ID linkage and freshness gate remain OPEN. |
 | NX-A07 — validation/record query hardening | Some request length limits and pagination checks exist; whitespace-only validation, filter/date validation, request body limits and audit payload policy need further review. | OPEN. |
@@ -150,3 +150,9 @@ OpenAI wiring now separates structured proposal generation from a read-only tool
 
 ## Verified regression run
 GitHub Actions run #121 (commit `a3b898e0437490887046e7629465995f5c959e84`) completed successfully: compile + 58 unit/regression tests on each of Python 3.11, 3.12 and 3.13. Details: https://github.com/Prasong1993/Loop-Controller/actions/runs/38014779739. This is workspace CI evidence, not production or ChatGPT integration evidence.
+
+
+## Code proposal integration — 2026-10-10
+- Added `nexus/code_proposal.py` and `POST /ai/code-proposal`, backed by the Responses API and strict structured outputs, with a code-model allowlist drawn from `nexus/capabilities.py`.
+- Every request requires an explicit `allowed_paths` list, task/project scope validation, and both request/server budget approval. Proposed paths are checked again after generation. Only hashes and metadata are recorded; code contents are returned to the caller but not persisted in operational logs.
+- No file write or code execution occurs. Shell, Apply Patch, Code Interpreter and Computer Use remain disabled. CI run #150 passed 67 tests across Python 3.11–3.13: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015297401.
