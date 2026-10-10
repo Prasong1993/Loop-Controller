@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from nexus.core import NEXUS, PolicyDenied, InvalidTransition
 
 class NexusCoreTests(unittest.TestCase):
@@ -8,6 +9,11 @@ class NexusCoreTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.n=NEXUS(str(Path(self.tmp.name)/"test.db"))
         self.project=self.n.create_project("test-project")["project_id"]
+    def add_verified(self, claim):
+        with patch("nexus.evidence.verify_source_quote", return_value={
+            "source_text":claim,"quoted_text":claim,"source_chars":len(claim),
+            "method":"exact normalized quote match","source_url":"https://example.com"}):
+            return self.n.verify_and_add_evidence(self.project,claim,"https://example.com",claim)
     def test_task_starts_at_intake(self):
         self.assertEqual(self.n.create_task(self.project,"demo")["state"],"INTAKE")
     def test_unknown_evidence_cannot_satisfy_research_gate(self):
@@ -17,19 +23,22 @@ class NexusCoreTests(unittest.TestCase):
         with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"PLAN")
     def test_verified_evidence_requires_source(self):
         with self.assertRaises(PolicyDenied): self.n.add_evidence(self.project,"claim","VERIFIED")
+    def test_caller_supplied_source_text_cannot_create_verified_evidence(self):
+        with self.assertRaises(PolicyDenied):
+            self.n.add_verified_evidence(self.project,"claim","https://example.com","claim","fabricated claim")
     def test_invalid_transition_denied(self):
         t=self.n.create_task(self.project,"demo")
         with self.assertRaises(InvalidTransition): self.n.transition(t["task_id"],"COMPLETE")
     def test_execute_requires_acceptance_and_verification(self):
         t=self.n.create_task(self.project,"demo")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
+        self.add_verified("official fact")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         with self.assertRaises(PolicyDenied): self.n.transition(t["task_id"],"EXECUTE")
     def test_complete_requires_audited_result(self):
         t=self.n.create_task(self.project,"demo","expected","manual check")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
+        self.add_verified("official fact")
         self.n.transition(t["task_id"],"PLAN"); self.n.transition(t["task_id"],"POLICY")
         self.n.transition(t["task_id"],"EXECUTE"); self.n.transition(t["task_id"],"VERIFY")
         self.n.transition(t["task_id"],"AUDIT")
@@ -68,7 +77,7 @@ class NexusCoreTests(unittest.TestCase):
     def test_checkpoint_restore_never_replays_execute_state(self):
         t=self.n.create_task(self.project,"unsafe restore","result","verify")
         self.n.transition(t["task_id"],"RESEARCH")
-        self.n.add_verified_evidence(self.project,"official fact","https://example.com","official fact","official fact")
+        self.add_verified("official fact")
         self.n.transition(t["task_id"],"PLAN")
         self.n.transition(t["task_id"],"POLICY")
         self.n.transition(t["task_id"],"EXECUTE")
