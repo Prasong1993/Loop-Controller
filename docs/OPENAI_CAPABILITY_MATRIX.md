@@ -1,60 +1,99 @@
-# NEXUS Architecture & Connection Map
+# OpenAI Capability Matrix
 Updated: 2026-10-10
-Status: implementation map for this repository; static source review, not a deployment claim.
+Status: project-specific activation matrix; official provider support is distinct from NEXUS implementation readiness.
 
-## 1. Goal and boundary
-NEXUS is a controller layer, not a replacement for OpenAI models or the ChatGPT app. OpenAI capabilities are replaceable worker/tool adapters. Deterministic NEXUS code owns project/task state, evidence acceptance, policy gates, operational records and verification. Model output is a proposal or tool request, never authorization.
+## Decision rule
 
-## 2. End-to-end flow
-`Request → Scope/Project → Evidence → Structured Plan → Deterministic Policy → Allowlisted Adapter → Observed Result → Verification → Audit/Records → Checkpoint/Recovery → Completion`
+NEXUS uses OpenAI's Responses API as the model/agent boundary. It does **not** enable every provider feature merely because the API offers it. A capability can be:
 
-Any missing permission, required evidence, budget approval, tool registration or verification result routes to `BLOCKED` or a targeted `RECOVER`; it must not be silently treated as success.
+- **ENABLED** — the project has a narrow implementation and local tests for its declared contract.
+- **DISABLED** — available in principle, but not enabled because required scope, policy, adapter, or tests are missing.
+- **BLOCKED** — the capability is a candidate but a required safety/runtime condition is not yet met.
+- **OUT_OF_SCOPE** — no accepted first-release requirement justifies enabling it.
 
-Capability enablement is centralized in `nexus/capabilities.py`; see [OpenAI Capability Matrix](OPENAI_CAPABILITY_MATRIX.md). The registry deliberately enables only model-verified tools and leaves code execution, computer use and patch application disabled until their runtime and policy contracts are proven.
+The deterministic registry is `nexus/capabilities.py`. Model text, structured output, a tool call, or a provider's “success” response never replaces NEXUS policy and independent verification.
 
-## 3. Component connection map
+## Provider and project activation matrix
 
-| Component | Owns | Inputs | Outputs / next connection | Must not own |
-|---|---|---|---|---|
-| REST API (`nexus/api.py`) | HTTP validation, auth gate, status/error mapping, request trace | Client request | Core calls, OpenAI proposal/run, record search | Model judgment as policy |
-| MCP adapter (`nexus/mcp_server.py`) | MCP transport and tool schemas; auth; tool operation trace | MCP client/tool request | Same core and record store as REST | Separate workflow rules/state |
-| Workflow core (`nexus/core.py`) | Project/task states, allowed transitions, deterministic policy, evidence gate, audit | Typed command and current DB state | Allow/deny/state change; evidence result | LLM calls or caller-supplied evidence proof |
-| Evidence fetcher (`nexus/evidence.py`) | Conservative HTTPS retrieval, SSRF/redirect/body controls, exact quote matching | Public HTTPS URL + requested quote | Retrieved-source verification result | Deciding project policy |
-| OpenAI planner (`nexus/openai_planner.py`) | Structured plan proposal via Responses API; optional documented capabilities | Task, constraints, allowed capability list, server-side budget gate | Typed `PROPOSAL_ONLY`, usage/error record | Executing proposed steps or approving policy |
-| OpenAI worker (`nexus/openai_adapter.py`) | Responses API loop and function-call orchestration | Prompt + allowlisted tool schemas | Model text/tool proposals; calls policy callback before handler | Direct arbitrary shell/code/network side effects |
-| Tool adapters/handlers | Narrow operations such as read status/task/audit | Validated tool args | Bounded result | Unlisted tools or cross-project access |
-| Operational Record Store (`nexus/records.py`) | Searchable append-only usage/error/decision/evidence/checkpoint/verification events | Redacted structured event | Traceable record IDs and paginated search | Raw prompts, secrets, unbounded payloads |
-| SQLite persistence | Durable state and records | Core/record transactions | State, evidence, audit, operational records | Cross-database atomicity assumptions |
-| Tests/CI | Reproducible contract and regression checks | Fixtures and fake provider clients | Test results for defined scope | Claiming live provider or mobile integration |
+| OpenAI capability | Official/API role | NEXUS status | Current implementation / reason |
+|---|---|---|---|
+| Responses API | Primary request/response API; supports built-in tools and function calling | ENABLED | `nexus/openai_adapter.py`, `nexus/openai_planner.py`, `nexus/code_proposal.py`; outbound paid calls require server + request approval. |
+| Structured Outputs | Constrains model response to a JSON schema | ENABLED | Used for plan and code proposals. Schema validity is not truth, permission or test evidence. |
+| Function Calling | Model emits a request for an application-defined function | ENABLED | Three read-only NEXUS handlers are exposed through `/ai/run`; policy and project scope are checked before handler execution. |
+| Code generation | Generates code text/file proposals | ENABLED — proposal only | `POST /ai/code-proposal`; explicit allowed paths, code-model allowlist, task/project checks, double budget gate. Does not write files, apply patches, or execute code. |
+| Web search tool | Hosted retrieval/search inside Responses API | ENABLED as an optional planner tool | Enabled only for model IDs listed in the central registry. Search output is candidate evidence; NEXUS source verification remains separate. |
+| File search tool | Hosted retrieval over configured vector stores | DISABLED | No approved vector-store lifecycle, access-control design, or data-scope tests. SQLite remains the controller's source of truth. |
+| Code Interpreter | Hosted sandboxed Python execution tool | BLOCKED for NEXUS execution | OpenAI model catalog lists it as provider-supported for the current flagship models, but NEXUS has not verified the complete execution policy, sandbox isolation, input/output limits, artifact handling, and independent result-verification contract. |
+| Computer use | Model-guided computer interaction tool | DISABLED | No authorized desktop/device adapter or human-approval boundary. This does not control the user's ChatGPT Android app or bypass its platform permissions. |
+| Hosted shell | Provider-hosted shell tool | DISABLED | No accepted command allowlist, filesystem/network boundary, approval contract, or side-effect reconciliation tests. |
+| Apply patch | Provider-supported patch proposal/application workflow | DISABLED | No workspace-bound patch adapter, diff review, idempotency, rollback and post-edit test contract. Code proposal generation is not patch application. |
+| MCP tool connection | Connects the model/API to registered remote MCP servers | NOT YET LIVE | NEXUS has a Streamable HTTP MCP server and bearer-token prototype gate. No verified public deployment, OAuth setup, ChatGPT app registration, or successful Android/mobile invocation. |
+| Embeddings | Vector representations for retrieval | DISABLED | No accepted vector-retrieval requirement; do not add a vector database just to increase component count. |
+| Moderation | Safety classification API | DISABLED | No demonstrated requirement in the current private controller scope. Reassess if untrusted public user content enters scope; it does not replace deterministic policy. |
+| Image generation/editing | Image/media generation | OUT_OF_SCOPE | No current controller requirement for generated image assets. |
+| Audio/realtime | Speech, transcription, realtime sessions | OUT_OF_SCOPE | No current controller requirement for audio. |
+| Batch | Asynchronous large-scale requests | OUT_OF_SCOPE | Current workflow is interactive; reassess only if queued bulk processing becomes a requirement. |
+| Fine-tuning | Model customization | OUT_OF_SCOPE | No evidence that training is needed; first use model selection, structured contracts, evidence, tools and evaluation. |
 
-## 4. Critical interfaces and invariants
-1. REST and MCP must call the same deterministic core; no duplicated business rules.
-2. `VERIFIED` evidence can only be created by a trusted fetch-and-match boundary; caller-supplied text is never proof.
-3. OpenAI plan generation requires both request approval and a server-side budget approval setting; absent approval means no provider call. The current default model is `gpt-6-luna` based on the official model catalog; actual account access and current price must be checked before enabling spend. Only the `web_search` capability is enabled for planner calls; code interpreter is not enabled without verified compatibility for the selected model.
-4. OpenAI function calls must be declared, registered, parsed, project-scoped and explicitly ALLOWed by deterministic policy before a handler runs.
-5. The OpenAI `/ai/run` allowlist is read-only: project status, task detail, audit. MCP separately exposes workflow mutations (create task, request state transition, checkpoint/restore, evidence recording); each uses the same core gate, but tenant/user authorization is still only a shared bearer token and remains a production blocker. No arbitrary shell or code-execution tool is exposed by the OpenAI worker.
-6. Every request/tool/provider action records a traceable redacted operational event where possible. Logging failure must never turn a denied action into an allowed action.
-7. Project/task/evidence/audit state and operational records use SQLite in the current implementation; a transaction spanning separate databases is not assumed atomic. Prefer one configured database path unless isolation is intentionally configured.
-8. Model/provider failures are not automatically retried if a tool may have side effects. Current exposed OpenAI tools are read-only; any future side-effecting tool requires idempotency and ambiguous-outcome reconciliation.
-9. `COMPLETE` is a controller state reached only after required verification and audit gates; a model's statement that work is done is not evidence.
-10. Health endpoints and static CI do not prove a remote service is deployed or usable from ChatGPT mobile.
+## Model routing
 
-## 5. State and record map
-- Evidence records have optional `task_id`: task-scoped VERIFIED evidence unlocks only that task; evidence with no task_id is explicitly project-wide and may support any task in that project. Cross-project task links are rejected. Existing SQLite databases are migrated by adding the nullable column and index.
-- Workflow states: `INTAKE → RESEARCH → PLAN → POLICY → EXECUTE → VERIFY → AUDIT → COMPLETE`; `RECOVER` and `BLOCKED` are controlled exception states.
-- Operational record types: `usage`, `error`, `evidence`, `decision`, `checkpoint`, `verification`.
-- Correlation keys: `project_id`, `task_id`, `session_id`, `trace_id`, `operation_id`; sensitive request/response bodies should not be persisted.
-- Each operational record should preserve timestamp, actor, component, status, stable error code, severity, redacted summary/payload, and relation to the workflow/task where known.
+The current defaults are selected for distinct roles, not because more model IDs automatically make the system better:
 
-## 6. Known integration gaps to close before release
-- Validate every REST and MCP tool mapping against current schemas and tests.
-- Prove core evidence verification cannot be bypassed through any endpoint, MCP tool or direct method.
-- Expand source-fetch tests with adversarial live DNS/IPv4/IPv6 and TLS cases; unit tests currently prove the connection uses the pinned validated IP and original TLS hostname, but do not establish production network resilience.
-- Align REST/MCP health version with `nexus/version.py`.
-- Ensure tool instrumentation covers every exported MCP tool and does not leak arguments/secrets.
-- Expand malformed tool-call, concurrency/idempotency and recovery tests; an in-process REST lifecycle and cross-project tool/evidence denial tests now pass in CI.
-- Run CI on the exact final commit and inspect failed job logs; do not infer a pass from a previous commit.
-- Public deployment, ChatGPT app registration and Android/mobile invocation remain unverified until tested live.
+| Role | Model ID | Selection reason | Guard |
+|---|---|---|---|
+| General plan / tool orchestration | `gpt-6-luna` | Official catalog describes it as cost-sensitive/high-volume | Paid API gate; actual account entitlement still untested. |
+| Code proposal | `gpt-6-astra` | Official catalog describes it as the flagship model for complex reasoning and coding | Explicit path allowlist, approved model registry, double budget gate; proposal only. |
+| Reviewed code alternative | `gpt-6.1-sol` | Official catalog describes it as a lower-cost alternative for complex work | Only enabled in the code-proposal allowlist; proposal only. |
 
-## 7. Verification vocabulary
-`STATIC INSPECTION` is not `UNIT TEST`; `UNIT TEST` is not `INTEGRATION TEST`; `INTEGRATION TEST` is not `REMOTE E2E`; none of these is a `PRODUCTION SMOKE TEST`. Report each level separately.
+Do not hardcode price or quota as guaranteed account entitlement. Public catalog prices/limits can change, and account tier, project spend limits and actual model access must be checked before live provider use.
+
+## Connection map
+
+```text
+ChatGPT / API client
+        │ (a supported connector or client; not yet registered live)
+        ▼
+NEXUS REST API / Streamable HTTP MCP adapter
+        │ authenticate + validate scope + trace
+        ▼
+Deterministic NEXUS core ───────► Evidence verifier
+        │                          HTTPS allowlist + pinned IP + quote match
+        ├────► OpenAI Responses planner ───► structured plan proposal
+        ├────► OpenAI code generator ─────► allowlisted code proposal
+        └────► OpenAI read-only function tools
+                    │
+                    ▼
+          deterministic policy + budget gate
+                    │
+          only allowlisted handlers proceed
+                    ▼
+       observed result → verification → audit/records
+                    │
+          checkpoint / recovery / completion
+```
+
+## Official source evidence (checked 2026-10-10)
+
+- Model catalog: https://developers.openai.com/api/docs/models
+- GPT-6 Astra: https://developers.openai.com/api/docs/models/gpt-6-astra
+- GPT-6.1 Sol: https://developers.openai.com/api/docs/models/gpt-6.1-sol
+- GPT-6 Luna: https://developers.openai.com/api/docs/models/gpt-6-luna
+- Responses API: https://developers.openai.com/api/docs/api-reference/responses
+- Function calling: https://developers.openai.com/api/docs/guides/function-calling
+- Structured Outputs: https://developers.openai.com/api/docs/guides/structured-outputs
+- Code generation: https://developers.openai.com/api/docs/guides/code-generation
+- Built-in tools: https://developers.openai.com/api/docs/guides/tools
+- Code Interpreter: https://developers.openai.com/api/docs/guides/tools-code-interpreter
+- MCP: https://developers.openai.com/api/docs/guides/tools-connectors-mcp
+
+## Reference-use boundary
+
+Anchor's archived project records were consulted for ideas such as requirements-to-test traceability, explicit status labels, recovery/idempotency, redacted operational logs, and read-back after writes. They are reference material only: NEXUS retains its own scope, state machine, code, schemas, and acceptance criteria; no wholesale copy of the Anchor workflow or architecture is authorized.
+
+## Release blockers
+
+- Live OpenAI provider request and account/model entitlement: NOT RUN.
+- Secure deployment, production identity/tenant isolation, rate limits, key rotation, retention and tamper-evident audit: NOT COMPLETE.
+- Workspace write/patch or code execution: NOT IMPLEMENTED.
+- ChatGPT app registration and Android/mobile end-to-end invocation: NOT CONFIGURED / NOT TESTED.
+- Current CI verifies code contracts and unit/regression tests only; it is not a remote production smoke test.
