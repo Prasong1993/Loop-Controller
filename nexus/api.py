@@ -10,6 +10,7 @@ import json
 import time
 import uuid
 from nexus.records import RecordStore
+from nexus.authorization import ProjectAuthorization
 from nexus.idempotency import IdempotencyStore, IdempotencyConflict, IdempotencyInProgress
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
@@ -25,6 +26,7 @@ app=FastAPI(title="NEXUS Controller API",version=VERSION,
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
 idempotency_store=IdempotencyStore(os.getenv("NEXUS_IDEMPOTENCY_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+project_authorization=ProjectAuthorization(os.getenv("NEXUS_AUTHZ_DB",os.getenv("NEXUS_DB","data/nexus.db")))
 plan_generator=OpenAIPlanGenerator(record_store)
 code_proposal_generator=OpenAICodeProposalGenerator(record_store)
 
@@ -196,10 +198,27 @@ class AICodeProposalIn(BaseModel):
         return value.strip()
 
 def require_api_key(request:Request, authorization:str|None=Header(default=None)):
+    """Authenticate either a configured per-principal token map or legacy single token."""
     expected=os.getenv("NEXUS_API_KEY","").strip()
+    tokens_raw=os.getenv("NEXUS_API_TOKENS","").strip()
+    if tokens_raw:
+        try:
+            tokens=json.loads(tokens_raw)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=503,detail="NEXUS_API_TOKENS must be valid JSON") from exc
+        if not isinstance(tokens,dict):
+            raise HTTPException(status_code=503,detail="NEXUS_API_TOKENS must be a JSON object")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401,detail="Bearer token required")
+        supplied=authorization[7:].strip()
+        principal=tokens.get(supplied)
+        if not isinstance(principal,str) or not principal.strip():
+            raise HTTPException(status_code=403,detail="Invalid API token")
+        return principal.strip()
     if not expected:
         host=request.client.host if request.client else ""
         if host in {"127.0.0.1","::1","localhost","testclient"}:
+            request.state.principal="local-development"
             return "local-development"
         raise HTTPException(status_code=503,detail="Remote API disabled: configure NEXUS_API_KEY")
     if not authorization or not authorization.startswith("Bearer "):
@@ -207,7 +226,60 @@ def require_api_key(request:Request, authorization:str|None=Header(default=None)
     supplied=authorization[7:].strip()
     if not hmac.compare_digest(supplied,expected):
         raise HTTPException(status_code=403,detail="Invalid API token")
-    return "authenticated"
+    return "legacy-shared"
+
+async def require_project_access(request:Request, authorization:str|None=Header(default=None)):
+    """Resolve project scope before the handler; fail closed for non-member principals."""
+    principal=require_api_key(request,authorization)
+    request.state.principal=principal
+    project_id=None
+    path_parts=[part for part in request.url.path.split("/") if part]
+    if len(path_parts)>=2 and path_parts[0]=="projects":
+        project_id=path_parts[1]
+    elif len(path_parts)>=2 and path_parts[0]=="tasks":
+        try:
+            task=controller.get_task(path_parts[1])
+            project_id=task["project_id"]
+        except ValueError:
+            # The endpoint will return its normal 404 for an unknown task.
+            project_id=None
+    if not project_id:
+        project_id=request.query_params.get("project_id")
+    body_data={}
+    if request.method in {"POST","PUT","PATCH"} and request.headers.get("content-type","").split(";")[0].strip()=="application/json":
+        try:
+            body_data=json.loads(await request.body())
+        except (json.JSONDecodeError,UnicodeDecodeError):
+            body_data={}
+    body_project=body_data.get("project_id") if isinstance(body_data,dict) else None
+    body_task=body_data.get("task_id") if isinstance(body_data,dict) else None
+    if body_project:
+        if project_id and project_id!=body_project:
+            raise HTTPException(status_code=403,detail={"code":"PROJECT_SCOPE_MISMATCH","message":"Request references more than one project."})
+        project_id=body_project
+    if body_task:
+        try:
+            task=controller.get_task(str(body_task))
+        except ValueError:
+            task=None
+        if task:
+            if project_id and project_id!=task["project_id"]:
+                raise HTTPException(status_code=403,detail={"code":"PROJECT_SCOPE_MISMATCH","message":"task_id does not belong to project_id"})
+            project_id=task["project_id"]
+    # Project creation has no existing scope; its handler records the creator as owner.
+    if request.method=="POST" and request.url.path=="/projects":
+        return principal
+    # Generic route-selection has no project parameter and only returns policy metadata.
+    if request.url.path=="/policy/route":
+        return principal
+    if project_id and not project_authorization.has_access(project_id,principal):
+        # Preserve 404 for unknown project IDs to avoid revealing tenant existence.
+        try:
+            controller.status(project_id)
+        except ValueError:
+            return principal
+        raise HTTPException(status_code=403,detail={"code":"PROJECT_ACCESS_DENIED","message":"Principal is not a member of this project."})
+    return principal
 
 def invoke(fn,*args,**kwargs):
     try: return fn(*args,**kwargs)
@@ -221,12 +293,13 @@ def invoke(fn,*args,**kwargs):
 @app.get("/health")
 def health(): return {"status":"ok","service":"nexus-controller","version":VERSION}
 
-@app.post("/projects",status_code=201,dependencies=[Depends(require_api_key)])
+@app.post("/projects",status_code=201,dependencies=[Depends(require_project_access)])
 def create_project(body:ProjectIn,request:Request):
     result=invoke(controller.create_project,body.name)
     request.state.project_id=result["project_id"]
+    project_authorization.grant_owner(result["project_id"],getattr(request.state,"principal","legacy-shared"))
     return result
-@app.get("/projects/{project_id}/status",dependencies=[Depends(require_api_key)])
+@app.get("/projects/{project_id}/status",dependencies=[Depends(require_project_access)])
 def project_status(project_id:str): return invoke(controller.status,project_id)
 @app.post("/tasks",status_code=201,dependencies=[Depends(require_api_key)])
 def create_task(body:TaskIn,request:Request):
