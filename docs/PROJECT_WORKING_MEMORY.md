@@ -429,3 +429,45 @@ Decision recorded: at the end of every assistant response in this project workfl
 - Automatic generation from a persistent master registry: UNKNOWN / not yet verified.
 - Project alias assignments for Project 1, Project 2, Project 3: NOT VERIFIED; no aliases are to be guessed.
 - No PR merge authorized.
+
+
+## 21. Conversation checkpoint — project plan and current Tool Router status
+
+**Checkpoint date:** 2026-10-11  
+**Purpose:** Preserve the current conversation's project plan and next actions in the repository before continuing implementation. This section records the known state at this checkpoint; it does not claim that untested features work.
+
+### Project identity and continuity plan
+- Repository: `Prasong1993/Loop-Controller`.
+- Active branch: `feature/tr-req-001-tool-router`.
+- Working memory file: `docs/PROJECT_WORKING_MEMORY.md`.
+- Project aliases requested: **Project 1**, **Project 2**, **Project 3**. Their canonical project IDs and alias assignments remain **NOT VERIFIED**; do not infer assignments from the current repository name.
+- Alias mappings must live in the persistent Project Master registry and resolve to immutable canonical `project_id` values. At session start, load the registry and reconcile the saved checkpoint with current repository/PR/CI evidence. If an alias is unknown or ambiguous, stop and ask rather than guessing.
+- The mandatory HTML roadmap requirement is documented in Section 20, but the user clarified that Mermaid diagrams and raw HTML code are not readable as the primary report. The main response should therefore use readable Thai text, tables, and ordered steps. If an HTML roadmap is required, it should be a rendered/readable view, not a raw code block. Do not claim a live dashboard without an implemented and verified data connection.
+
+### Current work request: TR-REQ-001 — Tool Router
+The user requested inspection of available tools/providers, free-first selection, quota/permission/cost controls, authorized fallback, checkpoint/audit records, and result verification.
+
+### Current evidence-based status
+- Router source and free-first selection rules: **VERIFIED — SOURCE**.
+- Paid-provider gate requiring both paid-use permission and budget approval: **VERIFIED — SOURCE**.
+- Fallback is restricted to explicitly classified safe provider errors; unclassified exceptions stop routing: **VERIFIED — SOURCE**.
+- Router checkpoint/audit integration is present in source; runtime behavior still requires test evidence: **VERIFIED — SOURCE / LIVE BEHAVIOR NOT VERIFIED**.
+- CI run previously inspected: compile and OpenAPI contract steps passed, but Unit Tests failed on Python 3.11, 3.12, and 3.13. The exact failure cause was not established from the job summary: **FAILED — CI; CAUSE UNKNOWN**.
+- Live provider connectivity, actual account quota, real provider fallback, and production behavior: **NOT RUN / UNKNOWN**.
+- PR #3, titled `TR-REQ-001: Add deterministic free-first Tool Router`, was last recorded as open and not merged. Refresh its live state before relying on that status. **No merge is authorized without explicit user approval.**
+
+### Next permitted actions
+1. Inspect the full failed Unit Test job logs to identify the actual failure cause; do not invent a cause.
+2. Fix the demonstrated issue on the active feature branch and run targeted checks as useful for diagnosis, followed by the integrated final CI gate.
+3. Verify checkpoint/audit readback and the relevant acceptance tests against the exact tested commit.
+4. Only when an authorized provider integration and credentials are available, test live connectivity, quota behavior, free-first routing, and safe fallback. Do not use paid services without explicit approval.
+5. Map the alias registry/resolver and Project Master plus five phase-scoped data boundaries to existing database/controller code before implementing new storage; reuse existing structures where suitable and avoid duplicate registries.
+6. Read this file back after material updates and report commit, test evidence, blockers, and the next step. Keep documentation status separate from implementation/test status.
+
+### Checkpoint classification
+- Conversation decisions recorded here: **RECORDED**.
+- Project alias assignments: **NOT VERIFIED**.
+- Alias resolver and Project Master/phase-store runtime implementation: **UNKNOWN pending source mapping and tests**.
+- Unit-test CI gate: **FAILED; exact cause not yet identified**.
+- Live provider checks: **NOT RUN**.
+- PR merge: **NOT AUTHORIZED**.
