@@ -45,6 +45,14 @@ class OpenAIPlanTests(unittest.TestCase):
         self.assertEqual(self.fake.kwargs["tools"],[{"type":"web_search"}])
         self.assertEqual(self.store.search(project_id="p1",record_type="usage")["total"],1)
 
+    def test_default_model_uses_current_cost_sensitive_catalog_entry(self):
+        planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
+        self.assertEqual(planner.model,"gpt-6-luna")
+    def test_code_interpreter_not_enabled_without_verified_model_support(self):
+        planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
+        with self.assertRaises(ValueError):
+            planner.propose(project_id="p1",task="run code",budget_approved=True,capabilities=["code_interpreter"])
+        self.assertIsNone(self.fake.kwargs)
     def test_unknown_capability_rejected(self):
         planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
         with self.assertRaises(ValueError):
