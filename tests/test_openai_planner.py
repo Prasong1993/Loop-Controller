@@ -48,6 +48,11 @@ class OpenAIPlanTests(unittest.TestCase):
     def test_default_model_uses_current_cost_sensitive_catalog_entry(self):
         planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
         self.assertEqual(planner.model,"gpt-6-luna")
+    def test_web_search_rejected_for_unreviewed_model_override(self):
+        planner=OpenAIPlanGenerator(self.store,client=self.client,model="unreviewed-model",api_key="fake")
+        with self.assertRaisesRegex(ValueError,"not verified for model"):
+            planner.propose(project_id="p1",task="research",budget_approved=True,capabilities=["web_search"])
+        self.assertIsNone(self.fake.kwargs)
     def test_code_interpreter_not_enabled_without_verified_model_support(self):
         planner=OpenAIPlanGenerator(self.store,client=self.client,api_key="fake")
         with self.assertRaises(ValueError):
