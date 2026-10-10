@@ -6,7 +6,7 @@ Status: implementation map for this repository; static source review, not a depl
 NEXUS is a controller layer, not a replacement for OpenAI models or the ChatGPT app. OpenAI capabilities are replaceable worker/tool adapters. Deterministic NEXUS code owns project/task state, evidence acceptance, policy gates, operational records and verification. Model output is a proposal or tool request, never authorization.
 
 ## 2. End-to-end flow
-`Request → Scope/Project → Evidence → Structured Plan → Deterministic Policy → Allowlisted Adapter → Observed Result → Verification → Audit/Records → Checkpoint/Recovery → Completion`
+`Request → Scope/Project → Evidence → [Structured Plan | Code Proposal | Read-Only Tool Request] → Deterministic Policy → Allowlisted Adapter → Observed Result → Verification → Audit/Records → Checkpoint/Recovery → Completion`
 
 Any missing permission, required evidence, budget approval, tool registration or verification result routes to `BLOCKED` or a targeted `RECOVER`; it must not be silently treated as success.
 
@@ -21,6 +21,7 @@ Capability enablement is centralized in `nexus/capabilities.py`; see [OpenAI Cap
 | Workflow core (`nexus/core.py`) | Project/task states, allowed transitions, deterministic policy, evidence gate, audit | Typed command and current DB state | Allow/deny/state change; evidence result | LLM calls or caller-supplied evidence proof |
 | Evidence fetcher (`nexus/evidence.py`) | Conservative HTTPS retrieval, SSRF/redirect/body controls, exact quote matching | Public HTTPS URL + requested quote | Retrieved-source verification result | Deciding project policy |
 | OpenAI planner (`nexus/openai_planner.py`) | Structured plan proposal via Responses API; optional documented capabilities | Task, constraints, allowed capability list, server-side budget gate | Typed `PROPOSAL_ONLY`, usage/error record | Executing proposed steps or approving policy |
+| Code proposal generator (`nexus/code_proposal.py`) | Structured code-file proposal through Responses API using coding model | Task, explicit allowlisted file paths, constraints, double budget gate | File contents + rationale + tests/risks as `PROPOSAL_ONLY`; records only hashes/metadata | Writing files, executing code, claiming tests ran, or approving its own changes |
 | OpenAI worker (`nexus/openai_adapter.py`) | Responses API loop and function-call orchestration | Prompt + allowlisted tool schemas | Model text/tool proposals; calls policy callback before handler | Direct arbitrary shell/code/network side effects |
 | Tool adapters/handlers | Narrow operations such as read status/task/audit | Validated tool args | Bounded result | Unlisted tools or cross-project access |
 | Operational Record Store (`nexus/records.py`) | Searchable append-only usage/error/decision/evidence/checkpoint/verification events | Redacted structured event | Traceable record IDs and paginated search | Raw prompts, secrets, unbounded payloads |
@@ -30,7 +31,7 @@ Capability enablement is centralized in `nexus/capabilities.py`; see [OpenAI Cap
 ## 4. Critical interfaces and invariants
 1. REST and MCP must call the same deterministic core; no duplicated business rules.
 2. `VERIFIED` evidence can only be created by a trusted fetch-and-match boundary; caller-supplied text is never proof.
-3. OpenAI plan generation requires both request approval and a server-side budget approval setting; absent approval means no provider call. The current default model is `gpt-6-luna` based on the official model catalog; actual account access and current price must be checked before enabling spend. Only the `web_search` capability is enabled for planner calls; code interpreter is not enabled without verified compatibility for the selected model.
+3. OpenAI plan generation requires both request approval and a server-side budget approval setting; absent approval means no provider call. The current default model is `gpt-6-luna` based on the official model catalog; actual account access and current price must be checked before enabling spend. Only model-verified optional tools are enabled through `nexus/capabilities.py`. The code proposal endpoint uses `gpt-6-astra` by default (or reviewed `gpt-6.1-sol`) and never writes files or executes code.
 4. OpenAI function calls must be declared, registered, parsed, project-scoped and explicitly ALLOWed by deterministic policy before a handler runs.
 5. The OpenAI `/ai/run` allowlist is read-only: project status, task detail, audit. MCP separately exposes workflow mutations (create task, request state transition, checkpoint/restore, evidence recording); each uses the same core gate, but tenant/user authorization is still only a shared bearer token and remains a production blocker. No arbitrary shell or code-execution tool is exposed by the OpenAI worker.
 6. Every request/tool/provider action records a traceable redacted operational event where possible. Logging failure must never turn a denied action into an allowed action.
