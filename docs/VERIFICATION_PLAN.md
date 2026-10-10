@@ -1,6 +1,6 @@
 # NEXUS — Verification and Test Plan
 
-สถานะ: Initial plan; ยังไม่มีผลทดสอบ runtime ที่อ้างว่า PASS
+สถานะ: PARTIAL VERIFIED — CI unit/regression suite and in-process REST lifecycle E2E passed on Python 3.11–3.13; live OpenAI, remote deployment, security penetration and ChatGPT mobile acceptance remain NOT RUN/BLOCKED.
 
 ## 1. หลักการรายงานผล
 แยกผลเป็น:
@@ -44,7 +44,7 @@
 - มี rollback procedure ที่ทดสอบได้
 
 ## 4. ผลทดสอบ
-ยังไม่มีผล runtime test ถูกบันทึกในเอกสารนี้ สถานะปัจจุบันคือ **NOT RUN** สำหรับ test cases ทั้งหมด จนกว่าจะมี implementation และหลักฐานผลทดสอบจริง
+ผลที่มีหลักฐานล่าสุดอยู่ในหัวข้อ “Latest verified CI execution” ด้านล่าง แถว test ที่ไม่มีการรันจริงยังคง NOT RUN; ห้ามใช้ผล CI แทนการทดสอบ remote deployment, real provider calls หรือ ChatGPT mobile integration.
 
 
 ## Execution evidence — 2026-10-10
@@ -92,3 +92,30 @@ These are test definitions in source. Mark PASS only after the latest GitHub Act
 | NXT-031 | Source quote absent from fetched text | Do not record VERIFIED | `tests/test_evidence.py` |
 | NXT-032 | HTTP/local URL supplied as source | Reject before fetch | `tests/test_evidence.py` |
 | NXT-033 | Direct evidence API attempts status VERIFIED | Deny; require verification endpoint | `tests/test_api.py` |
+
+
+## Latest verified CI execution — 2026-10-10
+**GitHub Actions run #121:** https://github.com/Prasong1993/Loop-Controller/actions/runs/38014779739  
+Commit: `a3b898e0437490887046e7629465995f5c959e84`  
+Workflow: compile + `python -m unittest discover -s tests -v`.
+
+| Runtime | Compile | Unit/regression suite | Result |
+|---|---|---|---|
+| Python 3.11 | PASS | 58 tests, 0 failures | PASS |
+| Python 3.12 | PASS | 58 tests, 0 failures | PASS |
+| Python 3.13 | PASS | 58 tests, 0 failures | PASS |
+
+Coverage in this run includes deterministic workflow gates, task-scoped evidence and legacy schema migration, HTTPS pinning/private-DNS rejection, REST lifecycle from project/task creation through verified COMPLETE and audit readback, budget gating, OpenAI tool policy behavior with fake clients, operational record search/redaction, and MCP bearer-gate behavior.
+
+**Not proven by this run:** real OpenAI API call/account entitlement, live public HTTPS fetching against adversarial DNS, production database concurrency, OAuth/tenant isolation, deployed remote endpoint, ChatGPT app registration, or use from the user's Android ChatGPT account. These remain NOT RUN/BLOCKED.
+
+## Added test-case mapping
+| Test ID | Added coverage | Source | Latest disposition |
+|---|---|---|---|
+| NXT-034 | Task-A evidence cannot unlock Task-B; cross-project task link denied | `tests/test_core.py` | PASS in CI #121 |
+| NXT-035 | Legacy evidence schema migrates additively to task_id | `tests/test_core.py` | PASS in CI #121 |
+| NXT-036 | HTTPS connection pins validated IP while preserving TLS hostname; private DNS denied | `tests/test_evidence.py` | PASS in CI #121 |
+| NXT-037 | Request + server-side paid budget gates prevent provider calls | `tests/test_api.py`, `tests/test_openai_planner.py` | PASS in CI #121 |
+| NXT-038 | Structured plan remains PROPOSAL_ONLY; unsupported capability rejected; no-tools request omits tools field | `tests/test_openai_planner.py` | PASS in CI #121 |
+| NXT-039 | OpenAI read tool cross-project request is blocked before handler | `tests/test_api.py`, `tests/test_openai_adapter.py` | PASS in CI #121 |
+| NXT-040 | REST lifecycle completes only after evidence, audit and result; audit readback works | `tests/test_api.py` | PASS in CI #121 |
