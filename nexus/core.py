@@ -115,18 +115,24 @@ class NEXUS:
 
     def add_verified_evidence(self,project_id:str,claim:str,source_url:str,quoted_text:str,
                               source_text:str,notes:str="",verified_by:str="source-verifier")->dict[str,Any]:
-        """Record VERIFIED only when the quote is present in fetched source text."""
+        """Deprecated insecure entry point; caller-supplied text is not proof of retrieval."""
+        raise PolicyDenied("Caller-supplied source_text cannot establish VERIFIED evidence; use verify_and_add_evidence")
+
+    def verify_and_add_evidence(self,project_id:str,claim:str,source_url:str,quoted_text:str,
+                                notes:str="",verified_by:str="source-verifier")->dict[str,Any]:
+        """Fetch and verify source content inside the trusted core boundary."""
+        from nexus.evidence import EvidenceFetchError, verify_source_quote
         import hashlib
-        def norm(value:str)->str:
-            return " ".join(value.casefold().split())
         if not claim.strip() or not quoted_text.strip():
             raise PolicyDenied("claim and quoted_text are required for verification")
-        if norm(quoted_text) not in norm(source_text):
-            raise PolicyDenied("quoted_text was not found in fetched source content")
-        if not source_url.startswith("https://"):
-            raise PolicyDenied("verified evidence requires HTTPS source")
-        proof={"quoted_text":quoted_text.strip(),"quote_sha256":hashlib.sha256(quoted_text.strip().encode("utf-8")).hexdigest(),
-               "verification_method":"exact normalized quote match","verified_by":verified_by,"source_text_chars":len(source_text)}
+        try:
+            fetched=verify_source_quote(source_url,quoted_text)
+        except EvidenceFetchError:
+            raise
+        proof={"quoted_text":fetched["quoted_text"],
+               "quote_sha256":hashlib.sha256(fetched["quoted_text"].strip().encode("utf-8")).hexdigest(),
+               "verification_method":fetched["method"],"verified_by":verified_by,
+               "source_text_chars":fetched["source_chars"]}
         eid=str(uuid.uuid4()); inspected=utc_now()
         with self._connect() as con:
             if not con.execute("SELECT 1 FROM projects WHERE project_id=?",(project_id,)).fetchone():
@@ -134,7 +140,7 @@ class NEXUS:
             con.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?)",
                         (eid,project_id,claim.strip(),EvidenceStatus.VERIFIED.value,source_url,inspected,
                          json.dumps({"operator_notes":notes,"verification":proof},ensure_ascii=False,sort_keys=True)))
-            self._audit(con,project_id,None,"EVIDENCE_VERIFIED","source-verifier","Exact quote matched fetched source",
+            self._audit(con,project_id,None,"EVIDENCE_VERIFIED","source-verifier","Exact quote matched trusted fetched source",
                         details={"evidence_id":eid,"quote_sha256":proof["quote_sha256"],"source_url":source_url})
         return {"evidence_id":eid,"project_id":project_id,"claim":claim.strip(),"status":"VERIFIED",
                 "source_url":source_url,"inspected_at":inspected,"verification":proof}
