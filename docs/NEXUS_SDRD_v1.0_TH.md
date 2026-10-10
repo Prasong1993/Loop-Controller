@@ -252,3 +252,14 @@ NEXUS ต้องออกแบบให้รองรับ Android, iOS, iP
 
 ## 20. สถานะ implementation
 มี initial Python/SQLite controller, FastAPI wrapper, unit-test source และ GitHub Actions CI workflow เพิ่มใน repository แล้ว อย่างไรก็ตาม source commit/read-back ไม่เท่ากับ test pass; จนกว่าจะเห็นผล workflow ให้ถือ CI เป็น NOT RUN/UNKNOWN. ยังไม่มี native Android/iOS/iPadOS apps และยังไม่พร้อม production.
+
+
+## 23. ข้อกำหนดการใช้งานและการตรวจรับแบบ ChatGPT-app-first
+
+NEXUS ตั้งเป้าให้ผู้ใช้เรียกใช้งานผ่านแอป ChatGPT บน Android, iOS และ iPadOS โดยอาศัย connected app/tool/API integration ที่บัญชีและ interface เป้าหมายรองรับ ไม่สร้างแอป NEXUS native แยกต่างหากในขอบเขตปัจจุบัน
+
+การทดสอบอุปกรณ์จริงทุกเครื่องไม่ใช่ release gate โดยอัตโนมัติ การทดสอบ device/OS จะบังคับใช้เมื่อมี native code หรือความสามารถที่ขึ้นกับ OS เช่น local device access, push notification หรือ background execution เท่านั้น
+
+ก่อนยืนยันว่า NEXUS ใช้งานผ่าน ChatGPT ได้ ต้องตั้งค่า integration จริงและทดสอบอย่างน้อย: (1) พบและเรียก tool ได้ในบัญชีเป้าหมาย (2) สร้างและอ่าน test task กลับ (3) policy ปฏิเสธ action ที่ไม่มีสิทธิ์ (4) อ่าน audit ได้ (5) warning/timeout ไม่ทำให้ blind retry หรือเกิด side effect ซ้ำ
+
+**สถานะปัจจุบัน: NOT CONFIGURED / NOT RUN.** โค้ด FastAPI ใน repository ยังไม่ใช่หลักฐานว่ามี runtime ที่ deploy อย่างปลอดภัยหรือเชื่อมต่อกับ ChatGPT แล้ว การผ่าน CI ไม่ถือเป็นการผ่าน integration acceptance
