@@ -237,3 +237,18 @@ Audit event ควรเก็บ event_id, project_id, task_id, stage, action, 
 | Version | วันที่ | การเปลี่ยนแปลง |
 |---|---|---|
 | 1.0 | 2026-10-10 | สร้างเอกสารอ้างอิงตั้งต้น; ประเด็น platform feasibility ยังเปิดอยู่ |
+
+
+## 19. ขอบเขตแพลตฟอร์มข้ามระบบ (revision 1.1)
+NEXUS ต้องออกแบบให้รองรับ Android, iOS, iPadOS, เว็บ และ runtime ฝั่งเซิร์ฟเวอร์ ไม่ถือว่าแอป ChatGPT หรือระบบปฏิบัติการแต่ละตัวมีความสามารถเท่ากัน
+
+- แกน state machine, policy, audit และ source-of-truth ควรอยู่ใน runtime ที่ควบคุมได้ ไม่ฝากสถานะสำคัญไว้บนมือถือเครื่องเดียว
+- งานเบื้องหลังบนมือถือเป็น best-effort ตามข้อจำกัดของ OS; งานสำคัญ/ยาวนานให้พิจารณา server-side orchestration ที่มีสิทธิ์และการตรวจสอบ
+- API keys ต้องไม่ฝังใน client app; ใช้ secret management ฝั่งเซิร์ฟเวอร์
+- การเชื่อมต่อ ChatGPT apps/tools ขึ้นกับบัญชี แผน ภูมิภาค workspace รุ่นโมเดล และ interface ต้องตรวจเป็นรายกรณี
+- การอ้างว่าใช้งานได้จริงต้องมี official source และผลทดสอบตามความเหมาะสม
+
+ดูรายละเอียดใน [Platform Compatibility Matrix](PLATFORM_COMPATIBILITY.md), [Implementation Guide](IMPLEMENTATION.md) และ [Error Report](ERROR_REPORT.md).
+
+## 20. สถานะ implementation
+มี initial Python/SQLite controller, FastAPI wrapper, unit-test source และ GitHub Actions CI workflow เพิ่มใน repository แล้ว อย่างไรก็ตาม source commit/read-back ไม่เท่ากับ test pass; จนกว่าจะเห็นผล workflow ให้ถือ CI เป็น NOT RUN/UNKNOWN. ยังไม่มี native Android/iOS/iPadOS apps และยังไม่พร้อม production.
