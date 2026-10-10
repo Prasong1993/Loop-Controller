@@ -34,7 +34,7 @@ API docs: http://127.0.0.1:8000/docs. Do not expose this prototype to the public
 
 ## Required workflow
 INTAKE -> RESEARCH -> PLAN -> POLICY -> EXECUTE -> VERIFY -> AUDIT -> COMPLETE.
-Research needs at least one VERIFIED evidence item before PLAN. EXECUTE needs expected outcome and verification method. COMPLETE needs AUDIT state and a recorded result.
+Research needs at least one VERIFIED evidence item scoped to the task or explicitly project-wide before PLAN. Task-specific evidence from a different task does not unlock this task. Existing SQLite databases gain the nullable evidence.task_id column through an additive migration. EXECUTE needs expected outcome and verification method. COMPLETE needs AUDIT state and a recorded result.
 
 ## Route candidate schema
 ```json
