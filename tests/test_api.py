@@ -140,7 +140,7 @@ class NexusApiTests(unittest.TestCase):
                 "method":"exact normalized quote match","source_url":"https://example.com"}):
                 evidence=self.client.post("/evidence/verify",json={"project_id":project_id,
                     "claim":"source-backed claim","source_url":"https://example.com",
-                    "quoted_text":"official quote"},headers=headers)
+                    "quoted_text":"official quote","task_id":task_id},headers=headers)
             self.assertEqual(evidence.status_code,200,evidence.text)
             self.assertEqual(evidence.json()["status"],"VERIFIED")
             for state in ["PLAN","POLICY","EXECUTE","VERIFY","AUDIT"]:
