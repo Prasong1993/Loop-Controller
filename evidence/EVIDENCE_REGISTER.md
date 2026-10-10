@@ -31,3 +31,17 @@
 - ผู้ตรวจหรือวิธีตรวจ
 
 **ข้อควรระวัง:** การมี URL ในรายการนี้ไม่ได้ทำให้ claim เป็น VERIFIED โดยอัตโนมัติ อย่าใช้ UNKNOWN เป็นหลักฐานยืนยัน
+
+
+## Research update — 2026-10-10
+The following official pages were opened and inspected during this update. These findings support only the claims listed; they do not certify NEXUS itself.
+
+| ID | Source | URL | Claim supported | Status | Limitation |
+|---|---|---|---|---|---|
+| NXS-008 | Android Developers — Foreground services overview | https://developer.android.com/develop/background-work/services/fgs | Foreground services have defined use/permission requirements; not a blanket invisible automation capability | VERIFIED | Specific behavior depends on OS/API target and service type |
+| NXS-009 | Apple Developer — Choosing Background Strategies | https://developer.apple.com/documentation/backgroundtasks/choosing-background-strategies-for-your-app | Apple provides specific system-managed background strategies and limited runtime | VERIFIED | Must verify details for exact OS versions and use case |
+| NXS-010 | OpenAI API — Function calling | https://developers.openai.com/api/docs/guides/function-calling | Model can request application-defined tool calls; app handles tool execution | VERIFIED | Does not mean ChatGPT mobile app exposes arbitrary native tool execution |
+| NXS-011 | OpenAI Help — Connected apps in ChatGPT | https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt | Connected app availability varies by app, plan, region, workspace, role, model and interface | VERIFIED | User-specific availability remains UNKNOWN |
+| NXS-012 | NASA — System Design Processes | https://www.nasa.gov/reference/4-0-system-design-processes/ | Official NASA system design process reference exists and can inform process design | VERIFIED | Does not certify NEXUS or imply NASA endorsement |
+
+Inspection method: opened official pages using live scrape on 2026-10-10. Exact account-specific integrations, device tests, deployment behavior, and provider quotas remain UNKNOWN until independently checked.
