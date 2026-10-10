@@ -65,3 +65,11 @@ Native Android/iOS/iPadOS NEXUS clients and physical-device matrix testing are *
 The real release blocker is that the controller/API has not been deployed securely or connected to the target ChatGPT account. Live integration checks (tool availability, authorized task round-trip, policy denial, audit readback and warning/timeout behavior) remain **NOT CONFIGURED / NOT RUN**. CI success does not close this blocker.
 
 The following remain open before production: authentication/authorization, TLS, secrets management, tenant isolation, source-content evidence verification, checkpoint restoration, idempotency/recovery, and supported ChatGPT integration adapter.
+
+
+## Implementation update — guarded restore and API access gate
+
+- Implemented guarded checkpoint restore in `nexus/core.py`. Restore requires the task to be BLOCKED/RECOVER, only restores safe workflow metadata states, refuses EXECUTE-state checkpoints, and writes a CHECKPOINT_RESTORED audit event.
+- Added `POST /tasks/{task_id}/restore` and API bearer-token gate in `nexus/api.py`. Remote requests fail closed if `NEXUS_API_KEY` is absent; health remains public. Unknown identifiers now map to 404, policy denials to 403, and invalid transitions to 409.
+- Added API authentication/error mapping tests and core restore tests. These are **implemented but CI status for the newest commit is pending verification**.
+- Remaining gaps: account-specific ChatGPT connector selection/configuration, secure deployment, production identity/tenant isolation, evidence content verification, provider execution adapters and restore idempotency/production review.
