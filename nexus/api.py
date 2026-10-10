@@ -54,7 +54,7 @@ async def operational_record_middleware(request: Request, call_next):
     finally:
         elapsed=max(0,int((time.monotonic()-started)*1000))
         project_id="system"
-        task_id=None
+        task_id=getattr(request.state,"task_id",None)
         segments=[part for part in request.url.path.split("/") if part]
         if getattr(request.state,"project_id",None):
             project_id=request.state.project_id
@@ -226,11 +226,13 @@ def restore_checkpoint(task_id:str,body:RestoreIn):
 @app.post("/evidence",dependencies=[Depends(require_api_key)])
 def add_evidence(body:EvidenceIn,request:Request):
     request.state.project_id=body.project_id
+    request.state.task_id=body.task_id
     return invoke(controller.add_evidence,body.project_id,body.claim,body.status,body.source_url,body.notes,body.task_id)
 
 @app.post("/evidence/verify",dependencies=[Depends(require_api_key)])
 def verify_evidence(body:VerifyEvidenceIn,request:Request):
     request.state.project_id=body.project_id
+    request.state.task_id=body.task_id
     try:
         return invoke(controller.verify_and_add_evidence,body.project_id,body.claim,body.source_url,
                      body.quoted_text,body.notes,"api-source-verifier",task_id=body.task_id)
@@ -273,6 +275,7 @@ def propose_ai_plan(body:AIPlanIn,request:Request):
 @app.post("/ai/code-proposal",dependencies=[Depends(require_api_key)])
 def propose_code(body:AICodeProposalIn,request:Request):
     request.state.project_id=body.project_id
+    request.state.task_id=body.task_id
     budget_gate=os.getenv("NEXUS_OPENAI_BUDGET_APPROVED","").casefold()=="true"
     trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     # Validate project/task scope before a paid provider call.
