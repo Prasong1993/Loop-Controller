@@ -10,6 +10,7 @@ import time
 import uuid
 from typing import Any
 from nexus.records import RecordStore
+from nexus.capabilities import resolve_optional_tools
 
 PLAN_SCHEMA = {
   "type": "object",
@@ -74,9 +75,10 @@ class OpenAIPlanGenerator:
             raise ValueError("task must be at most 20000 characters")
         constraints = constraints or []
         capabilities = list(dict.fromkeys(capabilities or []))
-        allowed = {"web_search"}
-        if set(capabilities) - allowed:
-            raise ValueError("capability is not enabled in this implementation")
+        try:
+            tools = resolve_optional_tools(capabilities, self.model)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
         trace_id = trace_id or str(uuid.uuid4())
         operation_id = str(uuid.uuid4())
         if not budget_approved:
@@ -84,12 +86,7 @@ class OpenAIPlanGenerator:
                          "OPENAI_BUDGET_APPROVAL_REQUIRED", {"capabilities": capabilities})
             raise OpenAIPlanError("OPENAI_BUDGET_APPROVAL_REQUIRED",
                                   "OpenAI API use is blocked until paid API budget is explicitly approved.")
-        tools = []
-        if "web_search" in capabilities:
-            tools.append({"type": "web_search"})
-        if "code_interpreter" in capabilities:
-            tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
-        started = time.monotonic()
+                started = time.monotonic()
         try:
             request_args = {
                 "model": self.model,
