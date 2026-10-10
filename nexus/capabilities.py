@@ -50,13 +50,13 @@ CAPABILITY_REGISTRY = {
         "status": "BLOCKED",
         "kind": "built_in_tool",
         "risk": "code_execution",
-        "notes": "Selected model compatibility and sandbox contract are not verified for this deployment.",
+        "notes": "Provider model support is documented; NEXUS execution remains blocked pending sandbox isolation, input/output limits, artifact handling, policy and independent verification tests.",
     },
     "computer_use": {
         "status": "DISABLED",
         "kind": "built_in_tool",
         "risk": "high",
-        "notes": "No authorized desktop/device action adapter or human approval policy is implemented.",
+        "notes": "Provider support does not grant control of ChatGPT/mobile devices; no authorized desktop/device adapter or human approval boundary is implemented.",
     },
     "shell": {
         "status": "DISABLED",
@@ -68,7 +68,7 @@ CAPABILITY_REGISTRY = {
         "status": "DISABLED",
         "kind": "code_edit_tool",
         "risk": "write",
-        "notes": "Requires a workspace-bound patch adapter, diff review, idempotency and post-edit tests.",
+        "notes": "Provider support is separate from local activation; requires a workspace-bound patch adapter, diff review, idempotency, rollback and post-edit tests.",
     },
     "image_generation": {
         "status": "OUT_OF_SCOPE",
