@@ -17,6 +17,7 @@ from mcp.server.fastmcp import FastMCP
 from nexus.core import NEXUS, PolicyDenied
 from nexus.records import RecordStore
 from nexus.evidence import EvidenceFetchError, verify_source_quote
+from nexus.version import VERSION
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
@@ -32,6 +33,12 @@ def track_tool(fn):
         values=bound.arguments
         project_id=str(values.get("project_id") or "system")
         task_id=values.get("task_id")
+        if not values.get("project_id") and task_id:
+            try:
+                task_row=controller.get_task(str(task_id))
+                project_id=str(task_row.get("project_id") or "system")
+            except Exception:
+                pass
         outcome="SUCCESS"
         error_code=None
         try:
@@ -66,9 +73,10 @@ mcp=FastMCP("NEXUS Controller",stateless_http=True,json_response=True)
 @track_tool
 def nexus_health()->dict:
     """Return controller liveness and integration version."""
-    return {"status":"ok","service":"nexus-controller","version":"0.3.0"}
+    return {"status":"ok","service":"nexus-controller","version":VERSION}
 
 @mcp.tool()
+@track_tool
 def nexus_create_project(name:str)->dict:
     """Create a project and return its project_id."""
     return controller.create_project(name)
@@ -121,6 +129,18 @@ def nexus_verify_source_evidence(project_id:str,claim:str,source_url:str,quoted_
 def nexus_read_audit(project_id:str,task_id:str|None=None)->list[dict]:
     """Read audit events for a project, optionally filtered by task_id."""
     return controller.audit(project_id,task_id)
+
+
+@mcp.tool()
+@track_tool
+def nexus_search_records(project_id:str,record_type:str|None=None,task_id:str|None=None,
+                         trace_id:str|None=None,operation_id:str|None=None,status:str|None=None,
+                         error_code:str|None=None,component:str|None=None,query:str|None=None,
+                         limit:int=100,offset:int=0)->dict:
+    """Search structured usage/error/evidence/decision/checkpoint/verification records."""
+    return record_store.search(project_id=project_id,record_type=record_type,task_id=task_id,
+        trace_id=trace_id,operation_id=operation_id,status=status,error_code=error_code,
+        component=component,query=query,limit=limit,offset=offset)
 
 @mcp.tool()
 def nexus_select_route(candidates:list[dict],allow_paid:bool=False,budget_approved:bool=False)->dict:
