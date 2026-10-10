@@ -6,6 +6,10 @@ only liveness/version metadata.
 """
 import hmac
 import os
+import json
+import time
+import uuid
+from nexus.records import RecordStore
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from nexus.core import NEXUS, PolicyDenied
@@ -14,6 +18,61 @@ from nexus.evidence import EvidenceFetchError, verify_source_quote
 app=FastAPI(title="NEXUS Controller API",version="0.2.0",
  description="Evidence-first deterministic workflow controller")
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
+record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+
+@app.middleware("http")
+async def operational_record_middleware(request: Request, call_next):
+    """Capture every REST request outcome without storing raw bodies or secrets."""
+    started=time.monotonic()
+    trace_id=request.headers.get("x-request-id","").strip()
+    if not trace_id or len(trace_id)>128:
+        trace_id=str(uuid.uuid4())
+    try:
+        response=await call_next(request)
+        status_code=response.status_code
+        return response
+    except Exception as exc:
+        status_code=500
+        try:
+            record_store.append(project_id="system",record_type="error",
+                trace_id=trace_id,actor_type="system",component="rest_api",
+                status="FAILED",error_code="HTTP_UNHANDLED_EXCEPTION",severity="high",
+                summary="Unhandled REST request exception",
+                payload={"category":"internal","exception_class":type(exc).__name__,
+                         "method":request.method,"path":request.url.path,
+                         "retryable":False,"http_status":500})
+        except Exception:
+            pass
+        raise
+    finally:
+        elapsed=max(0,int((time.monotonic()-started)*1000))
+        project_id="system"
+        task_id=None
+        segments=[part for part in request.url.path.split("/") if part]
+        if len(segments)>=2 and segments[0]=="projects":
+            project_id=segments[1]
+        elif len(segments)>=2 and segments[0]=="tasks":
+            task_id=segments[1]
+        try:
+            record_store.append(project_id=project_id,task_id=task_id,
+                record_type="usage",trace_id=trace_id,actor_type="system",
+                component="rest_api",status="SUCCESS" if status_code<400 else "FAILED",
+                summary=f"{request.method} {request.url.path}",
+                payload={"operation":request.method,"path":request.url.path,
+                         "http_status":status_code,"duration_ms":elapsed,
+                         "outcome":"success" if status_code<400 else "failure"})
+            if status_code>=400:
+                record_store.append(project_id=project_id,task_id=task_id,
+                    record_type="error",trace_id=trace_id,actor_type="system",
+                    component="rest_api",status="FAILED",error_code=f"HTTP_STATUS_{status_code}",
+                    severity="medium" if status_code<500 else "high",
+                    summary=f"REST request returned HTTP {status_code}",
+                    payload={"category":"http","method":request.method,
+                             "path":request.url.path,"http_status":status_code,
+                             "retryable":False})
+        except Exception:
+            # Observability must not turn a successful business operation into a failed request.
+            pass
 
 class ProjectIn(BaseModel):
     name:str=Field(min_length=1,max_length=200)
