@@ -85,6 +85,22 @@ class NexusApiTests(unittest.TestCase):
         self.assertGreaterEqual(response.json()["total"],1)
         self.assertEqual(response.json()["project_id"],"search-test")
 
+    def test_record_search_endpoint_filters_by_task_id(self):
+        from nexus.api import record_store
+        project_id = "search-task-filter-test"
+        record_store.append(project_id=project_id, task_id="task-a", record_type="usage",
+                            payload={"operation":"task-a"}, summary="record for task A")
+        record_store.append(project_id=project_id, task_id="task-b", record_type="usage",
+                            payload={"operation":"task-b"}, summary="record for task B")
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            response = self.client.get(
+                f"/records/search?project_id={project_id}&task_id=task-a",
+                headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["total"], 1)
+        self.assertEqual([row["task_id"] for row in body["records"]], ["task-a"])
+
 
     def test_evidence_quote_mismatch_maps_to_422(self):
         from nexus.evidence import EvidenceFetchError

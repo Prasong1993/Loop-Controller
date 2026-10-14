@@ -251,7 +251,7 @@ def search_records(request:Request,project_id:str,record_type:str|None=None,task
     request.state.project_id=project_id
     try:
         return record_store.search(project_id=project_id,record_type=record_type,
-            trace_id=trace_id,operation_id=operation_id,status=status,error_code=error_code,
+            task_id=task_id,trace_id=trace_id,operation_id=operation_id,status=status,error_code=error_code,
             component=component,query=query,since=since,until=until,limit=limit,offset=offset)
     except ValueError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
