@@ -1,7 +1,8 @@
+import os
 import unittest
-from types import SimpleNamespace
+from unittest.mock import patch
 
-from nexus.database import _HybridRow, _PostgresConnection
+from nexus.database import _HybridRow, _PostgresConnection, connect_database
 
 
 class FakeCursor:
@@ -62,6 +63,11 @@ class DatabaseAdapterTests(unittest.TestCase):
         cursor = adapter.execute("PRAGMA foreign_keys=ON")
         self.assertIsNone(cursor.fetchone())
         self.assertEqual(connection.calls, [])
+
+    def test_invalid_nonempty_database_url_fails_closed(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "not-a-resolved-render-reference"}):
+            with self.assertRaisesRegex(RuntimeError, "not a PostgreSQL connection URL"):
+                connect_database("/tmp/should-not-be-created.db")
 
     def test_context_manager_commits_on_success_and_rolls_back_on_error(self):
         committed = FakeConnection()
