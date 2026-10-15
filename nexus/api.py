@@ -374,16 +374,30 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         return {"decision":"ALLOW","reason_code":"READ_ONLY_PROJECT_SCOPED"}
     trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     def record(**event):
-        record_type=event.pop("record_type","usage")
-        payload={k:v for k,v in event.items() if k not in {"prompt","arguments","output","api_key"}}
+        record_type = event.pop("record_type", "usage")
+        payload = {k: v for k, v in event.items()
+                   if k not in {"prompt", "arguments", "output", "api_key"}}
         try:
-            record_store.append(project_id=body.project_id,record_type=record_type,
-                trace_id=trace_id,operation_id=payload.get("call_id") or payload.get("response_id"),
-                actor_type="system",component="openai_responses",
-                status=str(payload.get("decision",payload.get("outcome","RECORDED"))),
-                error_code=payload.get("error_code"),summary="OpenAI tool orchestration event",payload=payload)
-        except Exception:
-            pass
+            record_store.append(
+                project_id=body.project_id, record_type=record_type,
+                trace_id=trace_id,
+                operation_id=payload.get("call_id") or payload.get("response_id"),
+                actor_type="system", component="openai_responses",
+                status=str(payload.get("decision", payload.get("outcome", "RECORDED"))),
+                error_code=payload.get("error_code"),
+                summary="OpenAI tool orchestration event", payload=payload)
+        except Exception as log_exc:
+            import logging
+            logging.getLogger("nexus.observability").error(
+                "event_write_failed trace_id=%s component=openai_responses "
+                "record_type=%s writer_exception=%s",
+                trace_id, record_type, type(log_exc).__name__)
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "OBSERVABILITY_WRITE_FAILED",
+                        "message": "An OpenAI orchestration event could not be durably recorded; verify state before retrying.",
+                        "trace_id": trace_id},
+            ) from log_exc
     try:
         worker=OpenAIResponsesWorker(model=os.getenv("NEXUS_OPENAI_MODEL","gpt-6-luna"))
         result=worker.run(prompt=body.prompt,tools=_AI_READ_TOOLS,tool_handlers=handlers,
