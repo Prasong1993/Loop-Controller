@@ -28,65 +28,97 @@ code_proposal_generator=OpenAICodeProposalGenerator(record_store)
 
 @app.middleware("http")
 async def operational_record_middleware(request: Request, call_next):
-    """Capture every REST request outcome without storing raw bodies or secrets."""
-    started=time.monotonic()
-    trace_id=request.headers.get("x-request-id","").strip()
-    if not trace_id or len(trace_id)>128:
-        trace_id=str(uuid.uuid4())
-    request.state.trace_id=trace_id
+    """Capture REST outcomes; never silently report success if observability writes fail."""
+    started = time.monotonic()
+    trace_id = request.headers.get("x-request-id", "").strip()
+    if not trace_id or len(trace_id) > 128:
+        trace_id = str(uuid.uuid4())
+    request.state.trace_id = trace_id
+
     try:
-        response=await call_next(request)
-        status_code=response.status_code
-        return response
+        response = await call_next(request)
+        status_code = response.status_code
     except Exception as exc:
-        status_code=500
+        # Best-effort durable error record. If persistence itself fails, emit a
+        # redacted fallback to process logs so the failure is not swallowed.
         try:
-            record_store.append(project_id="system",record_type="error",
-                trace_id=trace_id,actor_type="system",component="rest_api",
-                status="FAILED",error_code="HTTP_UNHANDLED_EXCEPTION",severity="high",
+            record_store.append(
+                project_id="system", record_type="error", trace_id=trace_id,
+                actor_type="system", component="rest_api", status="FAILED",
+                error_code="HTTP_UNHANDLED_EXCEPTION", severity="high",
                 summary="Unhandled REST request exception",
-                payload={"category":"internal","exception_class":type(exc).__name__,
-                         "method":request.method,"path":request.url.path,
-                         "retryable":False,"http_status":500})
-        except Exception:
-            pass
+                payload={"category": "internal", "exception_class": type(exc).__name__,
+                         "method": request.method, "path": request.url.path,
+                         "retryable": False, "http_status": 500})
+        except Exception as log_exc:
+            import logging
+            logging.getLogger("nexus.observability").error(
+                "event_write_failed trace_id=%s component=rest_api "
+                "error_code=HTTP_UNHANDLED_EXCEPTION writer_exception=%s",
+                trace_id, type(log_exc).__name__)
         raise
-    finally:
-        elapsed=max(0,int((time.monotonic()-started)*1000))
-        project_id="system"
-        task_id=getattr(request.state,"task_id",None)
-        segments=[part for part in request.url.path.split("/") if part]
-        if getattr(request.state,"project_id",None):
-            project_id=request.state.project_id
-        elif len(segments)>=2 and segments[0]=="projects":
-            project_id=segments[1]
-        elif len(segments)>=2 and segments[0]=="tasks":
-            task_id=segments[1]
-            try:
-                task_row=controller.get_task(task_id)
-                project_id=task_row["project_id"]
-            except Exception:
-                pass
+
+    elapsed = max(0, int((time.monotonic() - started) * 1000))
+    project_id = "system"
+    task_id = getattr(request.state, "task_id", None)
+    segments = [part for part in request.url.path.split("/") if part]
+    if getattr(request.state, "project_id", None):
+        project_id = request.state.project_id
+    elif len(segments) >= 2 and segments[0] == "projects":
+        project_id = segments[1]
+    elif len(segments) >= 2 and segments[0] == "tasks":
+        task_id = segments[1]
         try:
-            record_store.append(project_id=project_id,task_id=task_id,
-                record_type="usage",trace_id=trace_id,actor_type="system",
-                component="rest_api",status="SUCCESS" if status_code<400 else "FAILED",
-                summary=f"{request.method} {request.url.path}",
-                payload={"operation":request.method,"path":request.url.path,
-                         "http_status":status_code,"duration_ms":elapsed,
-                         "outcome":"success" if status_code<400 else "failure"})
-            if status_code>=400:
-                record_store.append(project_id=project_id,task_id=task_id,
-                    record_type="error",trace_id=trace_id,actor_type="system",
-                    component="rest_api",status="FAILED",error_code=f"HTTP_STATUS_{status_code}",
-                    severity="medium" if status_code<500 else "high",
-                    summary=f"REST request returned HTTP {status_code}",
-                    payload={"category":"http","method":request.method,
-                             "path":request.url.path,"http_status":status_code,
-                             "retryable":False})
+            task_row = controller.get_task(task_id)
+            project_id = task_row["project_id"]
         except Exception:
-            # Observability must not turn a successful business operation into a failed request.
+            # Keep system scope if task-to-project correlation cannot be verified.
             pass
+
+    try:
+        record_store.append(
+            project_id=project_id, task_id=task_id, record_type="usage",
+            trace_id=trace_id, actor_type="system", component="rest_api",
+            status="SUCCESS" if status_code < 400 else "FAILED",
+            summary=f"{request.method} {request.url.path}",
+            payload={"operation": request.method, "path": request.url.path,
+                     "http_status": status_code, "duration_ms": elapsed,
+                     "outcome": "success" if status_code < 400 else "failure"})
+        if status_code >= 400:
+            record_store.append(
+                project_id=project_id, task_id=task_id, record_type="error",
+                trace_id=trace_id, actor_type="system", component="rest_api",
+                status="FAILED", error_code=f"HTTP_STATUS_{status_code}",
+                severity="medium" if status_code < 500 else "high",
+                summary=f"REST request returned HTTP {status_code}",
+                payload={"category": "http", "method": request.method,
+                         "path": request.url.path, "http_status": status_code,
+                         "retryable": False})
+    except Exception as log_exc:
+        import logging
+        logging.getLogger("nexus.observability").error(
+            "event_write_failed trace_id=%s component=rest_api "
+            "http_status=%s writer_exception=%s",
+            trace_id, status_code, type(log_exc).__name__)
+        # Preserve an existing failure response, but never present a successful
+        # business response as successful when its required audit write failed.
+        if status_code < 400:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=503,
+                headers={"x-request-id": trace_id, "x-nexus-observability": "failed"},
+                content={"detail": {
+                    "code": "OBSERVABILITY_WRITE_FAILED",
+                    "message": "The operation outcome could not be durably recorded; verify state before retrying.",
+                    "trace_id": trace_id,
+                }},
+            )
+        response.headers["x-nexus-observability"] = "failed"
+    else:
+        response.headers["x-nexus-observability"] = "recorded"
+
+    response.headers["x-request-id"] = trace_id
+    return response
 
 class ProjectIn(BaseModel):
     name:str=Field(min_length=1,max_length=200)
