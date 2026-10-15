@@ -77,7 +77,9 @@ class _EmptyCursor:
 
 def connect_database(database: str):
     url = os.getenv("DATABASE_URL", "").strip()
-    if url.startswith(("postgres://", "postgresql://")):
+    if url:
+        if not url.startswith(("postgres://", "postgresql://")):
+            raise RuntimeError("DATABASE_URL is set but is not a PostgreSQL connection URL")
         try:
             import psycopg
         except ImportError as exc:
