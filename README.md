@@ -23,6 +23,7 @@ NEXUS เป็นชั้นควบคุม workflow สำหรับง�
 - [Architecture and connection map](docs/ARCHITECTURE_MAP.md)
 - [OpenAI capability matrix](docs/OPENAI_CAPABILITY_MATRIX.md)
 - [Operational record schema and search guide](docs/OPERATIONAL_RECORD_SCHEMA.md)
+- [Continuous logging, checkpoints, and periodic backup design](docs/CONTINUOUS_LOGGING_AND_BACKUP.md)
 - [Latest CI run — 73 tests + OpenAPI contract checks](https://github.com/Prasong1993/Loop-Controller/actions/runs/38015769056)
 - [Anchor reference-only boundary](docs/ANCHOR_REFERENCE_BOUNDARIES.md)
 

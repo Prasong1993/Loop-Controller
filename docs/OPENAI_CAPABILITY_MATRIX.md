@@ -11,7 +11,7 @@ NEXUS uses OpenAI's Responses API as the model/agent boundary. It does **not** e
 - **BLOCKED** — the capability is a candidate but a required safety/runtime condition is not yet met.
 - **OUT_OF_SCOPE** — no accepted first-release requirement justifies enabling it.
 
-The deterministic registry is `nexus/capabilities.py`. Model text, structured output, a tool call, or a provider's “success” response never replaces NEXUS policy and independent verification.
+The deterministic registry is `nexus/capabilities.py`. OpenAI is the primary AI core for this project; the architecture and required project-wide integration checks are defined in [Project Core and Compatibility Gate](PROJECT_CORE_AND_COMPATIBILITY_GATE.md). Model text, structured output, a tool call, or a provider's “success” response never replaces NEXUS policy and independent verification.
 
 ## Provider and project activation matrix
 
