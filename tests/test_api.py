@@ -32,6 +32,40 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(accepted.status_code, 201)
 
 
+    def test_rate_limit_returns_429_after_configured_budget(self):
+        import nexus.api as api_module
+        api_module._rate_limit_state.clear()
+        with patch.dict(os.environ,{"NEXUS_RATE_LIMIT_PER_MINUTE":"1"}):
+            first=self.client.get("/health")
+            second=self.client.get("/health")
+        self.assertEqual(first.status_code,200)
+        self.assertEqual(second.status_code,429)
+
+    def test_mandatory_start_audit_failure_stops_before_project_creation(self):
+        with patch.dict(os.environ,{"NEXUS_API_KEY":"test-secret"}):
+            with patch("nexus.api.record_store.append",side_effect=OSError("audit storage unavailable")):
+                response=self.client.post("/projects",json={"name":"must-not-create"},
+                    headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.json()["code"],"MANDATORY_AUDIT_UNAVAILABLE")
+
+    def test_project_level_authorization_denies_cross_tenant_reads_and_writes(self):
+        tokens={"alice-token":"alice","bob-token":"bob"}
+        auth_env=patch.dict(os.environ,{"NEXUS_API_TOKENS":__import__("json").dumps(tokens),"NEXUS_API_KEY":""})
+        auth_env.start()
+        self.addCleanup(auth_env.stop)
+        alice={"Authorization":"Bearer alice-token"}
+        bob={"Authorization":"Bearer bob-token"}
+        created=self.client.post("/projects",json={"name":"alice-private-project"},headers=alice)
+        self.assertEqual(created.status_code,201,created.text)
+        project_id=created.json()["project_id"]
+        denied_status=self.client.get(f"/projects/{project_id}/status",headers=bob)
+        self.assertEqual(denied_status.status_code,403,denied_status.text)
+        denied_task=self.client.post("/tasks",json={"project_id":project_id,"title":"bob injection"},headers=bob)
+        self.assertEqual(denied_task.status_code,403,denied_task.text)
+        allowed_status=self.client.get(f"/projects/{project_id}/status",headers=alice)
+        self.assertEqual(allowed_status.status_code,200,allowed_status.text)
+
     def test_direct_verified_evidence_is_denied(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
             project = self.client.post("/projects", json={"name":"evidence-deny"},
@@ -61,29 +95,51 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+    def test_task_dependencies_rest_round_trip(self):
+        headers={"Authorization":"Bearer test-secret"}
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+            project=self.client.post("/projects",json={"name":"dependency-api-test"},headers=headers)
+            self.assertEqual(project.status_code,201)
+            project_id=project.json()["project_id"]
+            prerequisite=self.client.post("/tasks",json={"project_id":project_id,"title":"prerequisite"},headers=headers)
+            dependent=self.client.post("/tasks",json={"project_id":project_id,"title":"dependent"},headers=headers)
+            self.assertEqual(prerequisite.status_code,201)
+            self.assertEqual(dependent.status_code,201)
+            added=self.client.post(f"/tasks/{dependent.json()['task_id']}/dependencies",
+                json={"depends_on_task_id":prerequisite.json()["task_id"]},headers=headers)
+            listed=self.client.get(f"/tasks/{dependent.json()['task_id']}/dependencies",headers=headers)
+        self.assertEqual(added.status_code,201,added.text)
+        self.assertEqual(added.json()["depends_on_task_id"],prerequisite.json()["task_id"])
+        self.assertEqual(listed.status_code,200,listed.text)
+        self.assertEqual(len(listed.json()),1)
+        self.assertEqual(listed.json()[0]["state"],"INTAKE")
+
     def test_ai_plan_is_blocked_without_explicit_paid_budget_approval(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
-            response=self.client.post("/ai/plan",json={"project_id":"p-test","task":"draft a plan","budget_approved":True},
+            project=self.client.post("/projects",json={"name":"ai-plan-budget"},headers={"Authorization":"Bearer test-secret"}).json()
+            response=self.client.post("/ai/plan",json={"project_id":project["project_id"],"task":"draft a plan","budget_approved":True},
                                       headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,403)
         self.assertEqual(response.json()["detail"]["code"],"OPENAI_BUDGET_APPROVAL_REQUIRED")
 
     def test_ai_run_is_blocked_without_explicit_paid_budget_approval(self):
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"false"}):
-            response=self.client.post("/ai/run",json={"project_id":"p-test","prompt":"read status","budget_approved":True},
+            project=self.client.post("/projects",json={"name":"ai-run-budget"},headers={"Authorization":"Bearer test-secret"}).json()
+            response=self.client.post("/ai/run",json={"project_id":project["project_id"],"prompt":"read status","budget_approved":True},
                                       headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,403)
 
     def test_record_search_endpoint_returns_scoped_page(self):
         from nexus.api import record_store
-        record_store.append(project_id="search-test",record_type="usage",payload={"operation":"unit-test"},
-                            summary="search endpoint test")
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
-            response=self.client.get("/records/search?project_id=search-test&record_type=usage",
+            project=self.client.post("/projects",json={"name":"search-test"},headers={"Authorization":"Bearer test-secret"}).json()
+            record_store.append(project_id=project["project_id"],record_type="usage",payload={"operation":"unit-test"},
+                                summary="search endpoint test")
+            response=self.client.get(f"/records/search?project_id={project['project_id']}&record_type=usage",
                                      headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,200)
         self.assertGreaterEqual(response.json()["total"],1)
-        self.assertEqual(response.json()["project_id"],"search-test")
+        self.assertEqual(response.json()["project_id"],project["project_id"])
 
 
     def test_record_search_task_id_filter_excludes_other_tasks(self):
@@ -124,8 +180,9 @@ class NexusApiTests(unittest.TestCase):
                 return {"response_id":"fake-response","output_text":"blocked","tool_calls":[],
                         "policy_decisions":[seen["decision"]],"rounds":1,"usage":{}}
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            active=self.client.post("/projects",json={"name":"active-project"},headers={"Authorization":"Bearer test-secret"}).json()
             with patch("nexus.api.OpenAIResponsesWorker", FakeWorker):
-                response=self.client.post("/ai/run",json={"project_id":"active-project",
+                response=self.client.post("/ai/run",json={"project_id":active["project_id"],
                     "prompt":"read status","budget_approved":True},
                     headers={"Authorization":"Bearer test-secret","x-request-id":"test-trace-01"})
         self.assertEqual(response.status_code,200)
@@ -135,17 +192,21 @@ class NexusApiTests(unittest.TestCase):
             "nexus_get_project_status","nexus_read_audit","nexus_get_task"})
         self.assertEqual(response.json()["trace_id"],"test-trace-01")
         from nexus.api import record_store
-        scoped=record_store.search(project_id="active-project",record_type="usage",component="rest_api")
+        scoped=record_store.search(project_id=active["project_id"],record_type="usage",component="rest_api")
         self.assertGreaterEqual(scoped["total"],1)
         self.assertTrue(any(row["trace_id"]=="test-trace-01" for row in scoped["records"]))
 
 
     def test_rest_lifecycle_runs_through_verified_completion(self):
-        headers={"Authorization":"Bearer test-secret","x-request-id":"lifecycle-trace"}
-        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
+        headers={"Authorization":"Bearer executor-token","x-request-id":"lifecycle-trace"}
+        reviewer_headers={"Authorization":"Bearer reviewer-token","x-request-id":"lifecycle-verification"}
+        tokens={"executor-token":"executor","reviewer-token":"reviewer"}
+        with patch.dict(os.environ, {"NEXUS_API_TOKENS":__import__("json").dumps(tokens),"NEXUS_API_KEY":""}):
             project_response=self.client.post("/projects",json={"name":"rest-e2e-project"},headers=headers)
             self.assertEqual(project_response.status_code,201)
             project_id=project_response.json()["project_id"]
+            from nexus.api import project_authorization
+            project_authorization.grant_member(project_id,"reviewer")
             task_response=self.client.post("/tasks",json={"project_id":project_id,"title":"rest-e2e",
                 "expected_outcome":"verified result","verification_method":"assert final state"},
                 headers=headers)
@@ -163,8 +224,27 @@ class NexusApiTests(unittest.TestCase):
             self.assertEqual(evidence.status_code,200,evidence.text)
             self.assertEqual(evidence.json()["status"],"VERIFIED")
             for state in ["PLAN","POLICY","EXECUTE","VERIFY","AUDIT"]:
-                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=headers)
+                state_headers={**headers,"Idempotency-Key":"lifecycle-execute-v1"} if state=="EXECUTE" else headers
+                response=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":state},headers=state_headers)
                 self.assertEqual(response.status_code,200,response.text)
+            # Verification is only recordable while the task is in VERIFY.
+            verification=self.client.post(f"/tasks/{task_id}/verification",json={
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"reviewer",
+                "notes":"integration acceptance check"},headers=reviewer_headers)
+            self.assertEqual(verification.status_code,403)
+            recover=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"RECOVER","reason":"verification gate"},headers=headers)
+            self.assertEqual(recover.status_code,200,recover.text)
+            verify_again=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"VERIFY","reason":"independent verification"},headers=headers)
+            self.assertEqual(verify_again.status_code,200,verify_again.text)
+            verification=self.client.post(f"/tasks/{task_id}/verification",json={
+                "evidence_id":evidence.json()["evidence_id"],"verifier":"reviewer",
+                "notes":"integration acceptance check"},headers=reviewer_headers)
+            self.assertEqual(verification.status_code,200,verification.text)
+            readback=self.client.get(f"/tasks/{task_id}/verification",headers=headers)
+            self.assertEqual(readback.status_code,200)
+            self.assertEqual(readback.json()[0]["verification_id"],verification.json()["verification_id"])
+            audit_state=self.client.post(f"/tasks/{task_id}/transition",json={"to_state":"AUDIT"},headers=headers)
+            self.assertEqual(audit_state.status_code,200,audit_state.text)
             completed=self.client.post(f"/tasks/{task_id}/transition",json={
                 "to_state":"COMPLETE","result":"verified result"},headers=headers)
             self.assertEqual(completed.status_code,200,completed.text)

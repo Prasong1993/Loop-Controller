@@ -9,6 +9,8 @@ import hmac
 import os
 import time
 import uuid
+import json
+from contextvars import ContextVar
 import functools
 import inspect
 from starlette.responses import JSONResponse
@@ -16,11 +18,14 @@ from starlette.types import ASGIApp, Scope, Receive, Send
 from mcp.server.fastmcp import FastMCP
 from nexus.core import NEXUS, PolicyDenied
 from nexus.records import RecordStore
+from nexus.authorization import ProjectAuthorization
 from nexus.evidence import EvidenceFetchError
 from nexus.version import VERSION
 
 controller=NEXUS(os.getenv("NEXUS_DB","data/nexus.db"))
 record_store=RecordStore(os.getenv("NEXUS_RECORDS_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+project_authorization=ProjectAuthorization(os.getenv("NEXUS_AUTHZ_DB",os.getenv("NEXUS_DB","data/nexus.db")))
+current_principal=ContextVar("nexus_mcp_principal",default=None)
 
 def track_tool(fn):
     """Automatically record MCP tool usage and failures without persisting arguments."""
@@ -41,8 +46,34 @@ def track_tool(fn):
                 pass
         outcome="SUCCESS"
         error_code=None
+        principal=current_principal.get()
         try:
-            return fn(*args,**kwargs)
+            # Mandatory start record must be durable before any tool can mutate state.
+            record_store.append(project_id=project_id,task_id=task_id,record_type="usage",
+                trace_id=trace_id,actor_type="tool",actor_id=principal,component="mcp_server",
+                status="STARTED",summary=f"MCP tool {fn.__name__} started",
+                payload={"operation":fn.__name__,"phase":"TOOL_STARTED"})
+            if principal and fn.__name__!="nexus_health":
+                if fn.__name__=="nexus_transition_task":
+                    kwargs["actor"]=principal
+                if fn.__name__=="nexus_record_verification" and values.get("verifier")!=principal:
+                    raise PolicyDenied("verifier must match the authenticated principal")
+                scoped_project=str(values.get("project_id") or "")
+                if task_id:
+                    task_row=controller.get_task(str(task_id))
+                    if scoped_project and scoped_project!=task_row["project_id"]:
+                        raise PolicyDenied("task_id does not belong to project_id")
+                    scoped_project=task_row["project_id"]
+                if scoped_project and not project_authorization.has_access(scoped_project,principal):
+                    raise PolicyDenied("principal is not a member of this project")
+                read_only_tools={"nexus_health","nexus_get_task","nexus_get_task_dependencies",
+                    "nexus_get_project_status","nexus_read_audit","nexus_search_records","nexus_select_route"}
+                if scoped_project and fn.__name__ not in read_only_tools and not project_authorization.can_write(scoped_project,principal):
+                    raise PolicyDenied("project membership is read-only")
+            result=fn(*args,**kwargs)
+            if fn.__name__=="nexus_create_project":
+                project_authorization.grant_owner(result["project_id"],principal or "legacy-shared")
+            return result
         except Exception as exc:
             outcome="FAILED"
             error_code=type(exc).__name__.upper()[:80]
@@ -95,6 +126,18 @@ def nexus_get_task(task_id:str)->dict:
 
 @mcp.tool()
 @track_tool
+def nexus_add_task_dependency(task_id:str,depends_on_task_id:str)->dict:
+    """Add a same-project dependency before the policy gate; cycles and cross-project links are denied."""
+    return controller.add_task_dependency(task_id,depends_on_task_id,"chatgpt")
+
+@mcp.tool()
+@track_tool
+def nexus_get_task_dependencies(task_id:str)->list[dict]:
+    """Read a task's dependency list and current dependency states."""
+    return controller.get_task_dependencies(task_id)
+
+@mcp.tool()
+@track_tool
 def nexus_get_project_status(project_id:str)->dict:
     """Read project status, task counts and evidence counts."""
     return controller.status(project_id)
@@ -104,6 +147,18 @@ def nexus_get_project_status(project_id:str)->dict:
 def nexus_transition_task(task_id:str,to_state:str,actor:str="chatgpt",reason:str="",result:str|None=None,error_code:str|None=None)->dict:
     """Request a policy-gated state transition. Policy denials must not be retried blindly."""
     return controller.transition(task_id,to_state,actor,reason,result,error_code)
+
+@mcp.tool()
+@track_tool
+def nexus_record_verification(task_id:str,verifier:str,evidence_id:str,result_sha256:str="",notes:str="")->dict:
+    """Persist a passing verification while the task is in VERIFY; COMPLETE requires read-back proof."""
+    return controller.record_verification(task_id,verifier,evidence_id,result_sha256,notes)
+
+@mcp.tool()
+@track_tool
+def nexus_get_verifications(task_id:str)->list[dict]:
+    """Read back persisted verification records for a task."""
+    return controller.get_verifications(task_id)
 
 @mcp.tool()
 @track_tool
@@ -155,8 +210,9 @@ def nexus_select_route(candidates:list[dict],allow_paid:bool=False,budget_approv
     """Select an eligible route; does not execute a provider. Paid routes need both approvals."""
     return controller.policy_route(candidates,allow_paid,budget_approved)
 
+_mcp_rate_limit_state={}
 class BearerGateMiddleware:
-    """Fail-closed bearer gate; production should replace shared token with reviewed OAuth/identity."""
+    """Authenticate a principal, apply a process-local request limit, and scope tool calls."""
     def __init__(self,app:ASGIApp):
         self.app=app
     async def __call__(self,scope:Scope,receive:Receive,send:Send):
@@ -165,16 +221,49 @@ class BearerGateMiddleware:
         headers={k.lower():v.decode("latin1") for k,v in scope.get("headers",[])}
         auth=headers.get(b"authorization".lower(),"")
         expected=os.getenv("NEXUS_API_KEY","").strip()
+        token_map_raw=os.getenv("NEXUS_API_TOKENS","").strip()
         client=scope.get("client")
-        host=client[0] if client else ""
-        if not expected:
+        host=client[0] if client else "unknown"
+        principal=None
+        if token_map_raw:
+            try:
+                token_map=json.loads(token_map_raw)
+            except json.JSONDecodeError:
+                response=JSONResponse({"error":"NEXUS_API_TOKENS must be valid JSON"},status_code=503)
+                await response(scope,receive,send); return
+            token=auth[7:].strip() if auth.startswith("Bearer ") else ""
+            principal=token_map.get(token) if isinstance(token_map,dict) else None
+            if not isinstance(principal,str) or not principal.strip():
+                response=JSONResponse({"error":"Bearer token required or invalid"},status_code=401)
+                await response(scope,receive,send); return
+        elif not expected:
             if host not in {"127.0.0.1","::1","localhost","testclient"}:
                 response=JSONResponse({"error":"Remote MCP disabled: configure NEXUS_API_KEY"},status_code=503)
                 await response(scope,receive,send); return
+            principal="local-development"
         elif not auth.startswith("Bearer ") or not hmac.compare_digest(auth[7:].strip(),expected):
             response=JSONResponse({"error":"Bearer token required or invalid"},status_code=401)
             await response(scope,receive,send); return
-        await self.app(scope,receive,send)
+        else:
+            principal="legacy-shared"
+        try:
+            limit=max(1,int(os.getenv("NEXUS_RATE_LIMIT_PER_MINUTE","120")))
+        except ValueError:
+            response=JSONResponse({"error":"RATE_LIMIT_CONFIG_INVALID"},status_code=503)
+            await response(scope,receive,send); return
+        now=time.monotonic()
+        window,count=_mcp_rate_limit_state.get(host,(now,0))
+        if now-window>=60:
+            window,count=now,0
+        if count>=limit:
+            response=JSONResponse({"error":"RATE_LIMIT_EXCEEDED","retry_after_seconds":max(1,int(60-(now-window)))},status_code=429)
+            await response(scope,receive,send); return
+        _mcp_rate_limit_state[host]=(window,count+1)
+        token=current_principal.set(principal)
+        try:
+            await self.app(scope,receive,send)
+        finally:
+            current_principal.reset(token)
 
 app=mcp.streamable_http_app()
 app.add_middleware(BearerGateMiddleware)

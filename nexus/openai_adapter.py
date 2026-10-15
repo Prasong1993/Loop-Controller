@@ -62,15 +62,30 @@ class OpenAIResponsesWorker:
                 record(record_type=record_type, model=self.model, **fields)
 
         for round_index in range(self.max_tool_rounds + 1):
+            # Record request intent without storing prompts or request bodies. If the
+            # mandatory ledger is unavailable, defer the failure until one provider
+            # response is received, then stop before parsing or dispatching tool calls.
+            record_failure: Exception | None = None
+            try:
+                log("usage", outcome="request_started", round=round_index)
+            except Exception as exc:
+                record_failure = exc
+
             try:
                 response = self.client.responses.create(
                     model=self.model, input=conversation, tools=tools,
                     tool_choice="auto", parallel_tool_calls=False,
                 )
             except Exception as exc:
+                if record_failure is not None:
+                    raise record_failure
                 log("error", error_class=type(exc).__name__, error_code="OPENAI_RESPONSE_FAILED",
                     retryable=False, round=round_index)
                 raise OpenAIWorkerError("OpenAI Responses API request failed") from exc
+
+            if record_failure is not None:
+                # Never execute tools or make another provider call without the ledger.
+                raise record_failure
 
             output = list(getattr(response, "output", []) or [])
             usage = getattr(response, "usage", None)

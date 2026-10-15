@@ -40,6 +40,19 @@ class OpenAIWorkerTests(unittest.TestCase):
         self.assertEqual(result["usage"]["output_tokens"],5)
         self.assertTrue(any(x["record_type"]=="usage" and "usage" in x for x in seen))
 
+    def test_mandatory_record_failure_stops_before_tool_execution(self):
+        client=FakeClient([response([call("read_status", {})])])
+        called=[]
+        worker=OpenAIResponsesWorker(model="test-model", client=client)
+        def broken_record(**event):
+            raise OSError("ledger unavailable")
+        with self.assertRaises(OSError):
+            worker.run(prompt="status",tools=TOOL,
+                tool_handlers={"read_status":lambda args:called.append(args)},
+                policy_check=lambda name,args:{"decision":"ALLOW"},record=broken_record)
+        self.assertEqual(called,[])
+        self.assertEqual(len(client.responses.calls),1)
+
     def test_policy_deny_never_calls_handler(self):
         client=FakeClient([response([call("read_status", {})]), response([], "blocked")])
         called=[]

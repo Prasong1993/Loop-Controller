@@ -2,7 +2,8 @@ import os
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from nexus.mcp_server import app, BearerGateMiddleware
+from nexus.mcp_server import app, BearerGateMiddleware, current_principal, nexus_create_project, nexus_get_project_status
+from nexus.core import PolicyDenied
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -29,6 +30,19 @@ class NexusMcpGateTests(unittest.TestCase):
             response=client.get("/",headers={"Authorization":"Bearer test-secret"})
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json(),{"ok":True})
+
+    def test_mcp_project_access_denies_cross_tenant_principal(self):
+        alice=current_principal.set("mcp-alice")
+        try:
+            project=nexus_create_project("mcp tenant test")
+        finally:
+            current_principal.reset(alice)
+        bob=current_principal.set("mcp-bob")
+        try:
+            with self.assertRaises(PolicyDenied):
+                nexus_get_project_status(project["project_id"])
+        finally:
+            current_principal.reset(bob)
 
 if __name__ == "__main__":
     unittest.main()

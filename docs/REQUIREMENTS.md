@@ -64,5 +64,7 @@ The intended user interface is the ChatGPT application on Android, iOS and iPadO
 | NXR-036 | Live integration must be proven | No PASS/VERIFIED claim until a real request/response round-trip is captured | End-to-end acceptance |
 | NXR-037 | Physical-device testing is conditional | Required only for native or OS-dependent behavior, not merely because ChatGPT runs on mobile | Scope review |
 | NXR-038 | Permission and audit gate | Unauthorized actions are denied before execution; authorized test tasks are auditable and readable | Integration/security test |
+| NXR-039 | Task dependency DAG | Dependencies stay within one project, reject cycles/duplicates, and are editable only before the policy gate | Core/API unit and integration tests |
+| NXR-040 | Dependency execution gate | A task cannot enter EXECUTE until every declared dependency is COMPLETE | State-machine regression test |
 
 **Current integration status: NOT CONFIGURED / NOT RUN.** The repository's FastAPI code is not proof of a deployed or connected ChatGPT integration.

@@ -90,6 +90,74 @@ paths:
       responses:
         "200": { description: Task status }
         "404": { description: Task not found }
+  /tasks/{task_id}/dependencies:
+    post:
+      operationId: nexusAddTaskDependency
+      summary: Add a same-project task dependency before the policy gate
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [depends_on_task_id]
+              properties:
+                depends_on_task_id: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "201": { description: Dependency added }
+        "403": { description: Cross-project dependency, cycle, duplicate, or late dependency denied }
+        "404": { description: Task not found }
+    get:
+      operationId: nexusGetTaskDependencies
+      summary: Read dependencies and their current states
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Dependency list }
+        "404": { description: Task not found }
+  /tasks/{task_id}/verification:
+    get:
+      summary: Read persisted task verification records
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verification records read back from durable storage
+    post:
+      summary: Persist a passing verification linked to VERIFIED evidence
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [evidence_id, verifier]
+              properties:
+                evidence_id: {type: string}
+                verifier: {type: string}
+                result_sha256: {type: string}
+                notes: {type: string}
+      responses:
+        "200":
+          description: Verification was stored and read back
   /tasks/{task_id}/transition:
     post:
       operationId: nexusTransitionTask

@@ -59,3 +59,32 @@
 ## 2026-10-10 — Final repository snapshot verification
 - GitHub Actions run #179 passed compile, 4 OpenAPI contract checks and 73 tests on Python 3.11, 3.12 and 3.13: https://github.com/Prasong1993/Loop-Controller/actions/runs/38015769056.
 - Source changes and docs were read back from GitHub. Live provider/API entitlement, secure deployment, production identity/tenant isolation, code writing/execution and ChatGPT mobile integration remain NOT RUN/BLOCKED.
+
+
+## 2026-10-11 — Project Control API hardening work branch
+- Added `docs/PROJECT_CONTROL_API_TRACEABILITY.md` mapping requirements to source modules, tests, and verified evidence.
+- Fixed mandatory operational-recording failure handling in the OpenAI worker: a failed request-start record stops before tool dispatch and no automatic retry occurs; added a regression test.
+- Removed direct `RECOVER → EXECUTE` transition and added a regression test requiring recovery to pass through planning/policy.
+- Ported the reviewed deterministic Free-first ToolRouter and append-only router run/event ledger into the isolated work branch, including persistent stage checkpoints and verification-gated fallback.
+- Added a regression test proving checkpoint persistence failure stops before provider execution.
+- CI run #249 passed on Python 3.11, 3.12 and 3.13 (4 OpenAPI contract tests and 94 unit tests per matrix job): https://github.com/Prasong1993/Loop-Controller/actions/runs/38076731270
+- This is not a production-readiness claim: live provider adapters, durable idempotency for arbitrary side effects, production identity/tenant isolation, rate limiting, secured HTTPS deployment, and Plugin Creator round-trip remain open / NOT RUN.
+- All changes remain on `work/project-control-api-hardening-2026-10-11`; no existing PR was merged or modified.
+
+
+## 2026-10-11 — Task dependency controls
+- Added additive SQLite `task_dependencies` schema and deterministic dependency management in the controller.
+- Dependencies are restricted to tasks in the same project; self-links, cycles, duplicates and changes after the policy gate are rejected.
+- `EXECUTE` is blocked until every declared dependency is `COMPLETE`.
+- Added REST and MCP dependency operations, documented both REST operations in `openapi.yaml`, and added core/API/contract regression tests.
+- GitHub Actions run #262 passed on Python 3.11, 3.12 and 3.13 for commit `17eddd28d6ca87b04dd4697b829ddf5787e2302c`; each matrix job passed 4 OpenAPI contract tests and 97 unit tests: https://github.com/Prasong1993/Loop-Controller/actions/runs/38077231119.
+
+
+## 2026-10-11 — Security and execution-safety follow-up
+- Added persisted project membership and configured principal-token mapping for REST and MCP; cross-project negative tests reject unauthorized access.
+- Added a configurable process-local rate limiter and mandatory request/tool-start audit gates that fail closed before work starts.
+- Added a durable idempotency ledger for REST transitions into EXECUTE; completed responses replay, mismatched keys are rejected, and unknown outcomes cannot be automatically replayed.
+- Added durable verification records with read-back checks; COMPLETE requires passing verification tied to VERIFIED scoped evidence and a distinct authenticated verifier principal.
+- Added MCP tools for recording and reading verification records.
+- CI run [#281](https://github.com/Prasong1993/Loop-Controller/actions/runs/38079224483) passed for code commit `f55f07aabad2dd2b8769017517ec2d8b7c7d1445` on Python 3.11, 3.12 and 3.13.
+- Status remains PARTIAL: idempotency does not yet cover arbitrary provider/tool side effects; the limiter is process-local; final outcome audit handling is not fully fail-closed; semantic verification, crash reconciliation, secure HTTPS deployment and live Plugin Creator round-trip remain open. No merge or deployment performed.
