@@ -217,5 +217,21 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(propose.call_args.kwargs["allowed_paths"],["nexus/helper.py"])
         self.assertEqual(propose.call_args.kwargs["trace_id"],"code-trace")
 
+
+    def test_success_response_is_not_reported_when_event_write_fails(self):
+        with patch("nexus.api.record_store.append", side_effect=OSError("database unavailable")):
+            response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "OBSERVABILITY_WRITE_FAILED")
+        self.assertEqual(response.headers["x-nexus-observability"], "failed")
+        self.assertTrue(response.headers.get("x-request-id"))
+
+    def test_existing_error_response_is_preserved_when_event_write_fails(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY": "test-secret"}):
+            with patch("nexus.api.record_store.append", side_effect=OSError("database unavailable")):
+                response = self.client.post("/projects", json={"name": "should-not-run"})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["x-nexus-observability"], "failed")
+
 if __name__ == "__main__":
     unittest.main()
