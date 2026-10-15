@@ -7,6 +7,7 @@ from typing import Any
 import json
 import sqlite3
 import uuid
+from nexus.database import connect_database
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -42,10 +43,7 @@ class NEXUS:
         self._init_db()
 
     def _connect(self):
-        con=sqlite3.connect(self.database)
-        con.row_factory=sqlite3.Row
-        con.execute("PRAGMA foreign_keys=ON")
-        return con
+        return connect_database(self.database)
 
     def _init_db(self):
         with self._connect() as con:
