@@ -10,6 +10,7 @@ from typing import Any
 import json
 import sqlite3
 import uuid
+from nexus.database import connect_database
 
 SCHEMA_VERSION = "1.0"
 RECORD_TYPES = {"usage", "error", "evidence", "decision", "checkpoint", "verification"}
@@ -52,11 +53,7 @@ class RecordStore:
             """)
 
     def _connect(self):
-        con = sqlite3.connect(self.database, timeout=10)
-        con.row_factory = sqlite3.Row
-        con.execute("PRAGMA foreign_keys=ON")
-        con.execute("PRAGMA busy_timeout=10000")
-        return con
+        return connect_database(self.database)
 
     def append(self, *, project_id: str, record_type: str, payload: dict[str, Any],
                task_id: str | None = None, session_id: str | None = None,
