@@ -19,7 +19,7 @@ The deterministic registry is `nexus/capabilities.py`. Model text, structured ou
 |---|---|---|---|
 | Responses API | Primary request/response API; supports built-in tools and function calling | ENABLED | `nexus/openai_adapter.py`, `nexus/openai_planner.py`, `nexus/code_proposal.py`; outbound paid calls require server + request approval. |
 | Structured Outputs | Constrains model response to a JSON schema | ENABLED | Used for plan and code proposals. Schema validity is not truth, permission or test evidence. |
-| Function Calling | Model emits a request for an application-defined function | ENABLED | Three read-only NEXUS handlers are exposed through `/ai/run`; policy and project scope are checked before handler execution. |
+| Function Calling | Model emits a request for an application-defined function | ENABLED | Three built-in project-scoped read-only tools plus trusted server-admin read-only extensions via `nexus/openai_extensions.py`; every handler passes deterministic NEXUS policy. Write/execute extensions remain disabled on `/ai/run`. |
 | Code generation | Generates code text/file proposals | ENABLED — proposal only | `POST /ai/code-proposal`; explicit allowed paths, code-model allowlist, task/project checks, double budget gate. Does not write files, apply patches, or execute code. |
 | Web search tool | Hosted retrieval/search inside Responses API | ENABLED as an optional planner tool | Enabled only for model IDs listed in the central registry. Search output is candidate evidence; NEXUS source verification remains separate. |
 | File search tool | Hosted retrieval over configured vector stores | DISABLED | No approved vector-store lifecycle, access-control design, or data-scope tests. SQLite remains the controller's source of truth. |

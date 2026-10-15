@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from nexus.core import NEXUS, PolicyDenied
 from nexus.evidence import EvidenceFetchError
 from nexus.openai_adapter import OpenAIResponsesWorker, OpenAIWorkerError
+from nexus.openai_extensions import load_openai_extensions
 from nexus.openai_planner import OpenAIPlanGenerator, OpenAIPlanError
 from nexus.code_proposal import OpenAICodeProposalGenerator, CodeProposalError
 from nexus.version import VERSION
@@ -306,6 +307,9 @@ _AI_READ_TOOLS=[
   "parameters":{"type":"object","properties":{"project_id":{"type":"string"},"task_id":{"type":"string"}},"required":["project_id","task_id"],"additionalProperties":False},"strict":True}
 ]
 
+# Trusted server-admin extensions are loaded at startup; bad configuration fails closed.
+openai_extension_registry = load_openai_extensions()
+
 @app.post("/ai/run",dependencies=[Depends(require_api_key)])
 def run_ai_with_read_tools(body:AIRunIn,request:Request):
     request.state.project_id=body.project_id
@@ -333,12 +337,16 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
         if task["project_id"] != body.project_id: raise PolicyDenied("cross-project task access blocked")
         return task
     handlers={"nexus_get_project_status":status_handler,"nexus_read_audit":audit_handler,
-              "nexus_get_task":task_handler}
+              "nexus_get_task":task_handler, **openai_extension_registry.handlers}
+    available_tools = _AI_READ_TOOLS + openai_extension_registry.tools
+    extension_names = set(openai_extension_registry.handlers)
     def policy_check(name,args):
         if name not in handlers:
             return {"decision":"BLOCK","reason_code":"TOOL_NOT_ALLOWLISTED"}
         if args.get("project_id") != body.project_id:
             return {"decision":"BLOCK","reason_code":"PROJECT_SCOPE_MISMATCH"}
+        if name in extension_names:
+            return {"decision":"ALLOW","reason_code":"PROJECT_SCOPED_READ_ONLY_EXTENSION"}
         return {"decision":"ALLOW","reason_code":"READ_ONLY_PROJECT_SCOPED"}
     trace_id=getattr(request.state,"trace_id",None) or str(uuid.uuid4())
     def record(**event):
@@ -354,10 +362,11 @@ def run_ai_with_read_tools(body:AIRunIn,request:Request):
             pass
     try:
         worker=OpenAIResponsesWorker(model=os.getenv("NEXUS_OPENAI_MODEL","gpt-6-luna"))
-        result=worker.run(prompt=body.prompt,tools=_AI_READ_TOOLS,tool_handlers=handlers,
+        result=worker.run(prompt=body.prompt,tools=available_tools,tool_handlers=handlers,
                           policy_check=policy_check,record=record)
         result.update({"project_id":body.project_id,"trace_id":trace_id,
-                       "policy_boundary":"NEXUS_DETERMINISTIC_READ_ONLY_TOOLS"})
+                       "policy_boundary":"NEXUS_DETERMINISTIC_PROJECT_SCOPED_READ_ONLY_TOOLS",
+                       "registered_extension_tools":sorted(extension_names)})
         return result
     except OpenAIWorkerError as exc:
         raise HTTPException(status_code=502,detail={"code":"OPENAI_WORKER_FAILED","message":str(exc)}) from exc

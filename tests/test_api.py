@@ -140,6 +140,36 @@ class NexusApiTests(unittest.TestCase):
         self.assertTrue(any(row["trace_id"]=="test-trace-01" for row in scoped["records"]))
 
 
+    def test_ai_run_exposes_registered_extension_with_project_scope_policy(self):
+        from types import SimpleNamespace
+        seen = {}
+        class FakeWorker:
+            def __init__(self, *, model):
+                pass
+            def run(self, **kwargs):
+                seen["tool_names"] = [tool["name"] for tool in kwargs["tools"]]
+                seen["decision"] = kwargs["policy_check"](
+                    "read_project_documents", {"project_id":"other-project"})
+                return {"response_id":"extension-response","output_text":"blocked",
+                        "tool_calls":[],"policy_decisions":[seen["decision"]],"rounds":1,"usage":{}}
+        definition = {"type":"function","name":"read_project_documents",
+            "description":"Read documents in the active project",
+            "parameters":{"type":"object","properties":{"project_id":{"type":"string"}},
+                          "required":["project_id"],"additionalProperties":False},"strict":True}
+        registry = SimpleNamespace(tools=[definition],
+            handlers={"read_project_documents":lambda args: {"project_id":args["project_id"]}})
+        with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret","NEXUS_OPENAI_BUDGET_APPROVED":"true"}):
+            with patch("nexus.api.openai_extension_registry", registry), \
+                 patch("nexus.api.OpenAIResponsesWorker", FakeWorker):
+                response = self.client.post("/ai/run",
+                    json={"project_id":"active-project","prompt":"read documents","budget_approved":True},
+                    headers={"Authorization":"Bearer test-secret"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("read_project_documents", seen["tool_names"])
+        self.assertEqual(seen["decision"]["decision"], "BLOCK")
+        self.assertEqual(seen["decision"]["reason_code"], "PROJECT_SCOPE_MISMATCH")
+        self.assertEqual(response.json()["registered_extension_tools"], ["read_project_documents"])
+
     def test_rest_lifecycle_runs_through_verified_completion(self):
         headers={"Authorization":"Bearer test-secret","x-request-id":"lifecycle-trace"}
         with patch.dict(os.environ, {"NEXUS_API_KEY":"test-secret"}):
