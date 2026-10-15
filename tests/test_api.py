@@ -233,5 +233,37 @@ class NexusApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers["x-nexus-observability"], "failed")
 
+
+    def test_ai_run_returns_explicit_failure_when_orchestration_event_write_fails(self):
+        with patch.dict(os.environ, {"NEXUS_API_KEY": "test-secret",
+                                     "NEXUS_OPENAI_BUDGET_APPROVED": "true"}):
+            project_response = self.client.post(
+                "/projects", json={"name": "ai-run-log-failure"},
+                headers={"Authorization": "Bearer test-secret"})
+            self.assertEqual(project_response.status_code, 201)
+            project_id = project_response.json()["project_id"]
+
+            class FakeWorker:
+                def __init__(self, *, model):
+                    pass
+                def run(self, **kwargs):
+                    kwargs["record"](record_type="usage", outcome="simulated_response")
+                    return {"response_id": "fake", "output_text": "should not be returned",
+                            "tool_calls": [], "policy_decisions": [], "rounds": 1, "usage": {}}
+
+            with patch("nexus.api.OpenAIResponsesWorker", FakeWorker):
+                with patch("nexus.api.record_store.append",
+                           side_effect=OSError("database unavailable")):
+                    response = self.client.post(
+                        "/ai/run", json={"project_id": project_id, "prompt": "read status",
+                                         "budget_approved": True},
+                        headers={"Authorization": "Bearer test-secret",
+                                 "x-request-id": "ai-run-log-failure-trace"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "OBSERVABILITY_WRITE_FAILED")
+        self.assertEqual(response.json()["detail"]["trace_id"], "ai-run-log-failure-trace")
+        self.assertNotIn("should not be returned", response.text)
+
 if __name__ == "__main__":
     unittest.main()
